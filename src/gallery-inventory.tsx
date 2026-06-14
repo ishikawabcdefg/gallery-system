@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 
 // ─── 定数 ────────────────────────────────────────────────
 const STATUSES = {
@@ -42,9 +42,9 @@ const normalizeSpaces = (s: string) => s.replace(/[\u3000\u0020]+/g, " ");
 function PriceInput({ value, onChange, placeholder="例：280000", style={} }: {
   value: number|string; onChange: (v:number)=>void; placeholder?: string; style?: any;
 }) {
-  const [focused, setFocused] = React.useState(false);
-  const [raw, setRaw] = React.useState(String(value||""));
-  React.useEffect(()=>{ if(!focused) setRaw(String(value||"")); },[value,focused]);
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState(String(value||""));
+  useEffect(()=>{ if(!focused) setRaw(String(value||"")); },[value,focused]);
   const display = focused ? raw : (value!=null&&value!==""&&!isNaN(Number(value)) ? Number(value).toLocaleString() : "");
   return (
     <input
@@ -4807,7 +4807,7 @@ export default function GalleryApp() {
   const [editingConsignmentId, setEditingConsignmentId] = useState(null);
   const [nextConsignmentId, setNextConsignmentId] = useState(() => loadLS("gallery_nextConsignmentId", 6));
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  const mainRef = React.useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const navigateTo = (v: string) => {
     setView(v);
     setTimeout(() => { mainRef.current?.scrollTo(0, 0); }, 0);
@@ -9073,7 +9073,7 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
   const [open, setOpen] = useState(false);
   const [q, setQ]       = useState("");
   const [cursor, setCursor] = useState(-1);
-  const listRef = React.useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const filtered = counterparties.filter(c => {
     const nq = q.toLowerCase().replace(/[\s\u3000]+/g,"");
     return !nq || [c.name, c.company, c.name_kana].some(s => (s||"").toLowerCase().replace(/[\s\u3000]+/g,"").includes(nq));
