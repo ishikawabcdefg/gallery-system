@@ -60,6 +60,9 @@ function PriceInput({ value, onChange, placeholder="例：280000", style={} }: {
 }
 
 // フリガナ用 onBlur サニタイザ：カタカナ・半角スペース・長音符以外を除去し、スペースを正規化
+// ひらがな→カタカナ変換
+const hiraToKata = (s: string) => s.replace(/[\u3041-\u3096]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+
 const sanitizeKana = (s: string) =>
   normalizeSpaces(s.replace(/[^\u30A0-\u30FF\u0020\u3000]/g, "")).trim();
 
@@ -4962,7 +4965,7 @@ export default function GalleryApp() {
 
   const filteredCps = useMemo(() => counterparties.filter(c => {
     const mt = cpTypeFilter === "all" || c.type === cpTypeFilter;
-    const q  = cpSearch.toLowerCase().replace(/[\s\u3000]+/g,"");
+    const q  = hiraToKata(cpSearch).toLowerCase().replace(/[\s\u3000]+/g,"");
     const ms = !q || [c.name,c.name_kana,c.company,c.department,c.email,c.phone,c.address]
       .some(s=>(s||"").toLowerCase().replace(/[\s\u3000]+/g,"").includes(q));
     return mt && ms;
@@ -6008,6 +6011,7 @@ export default function GalleryApp() {
               counterparties={counterparties}
               artists={artists}
               artworkGroups={artworkGroups}
+              taxSettings={taxSettings}
               isMobile={isMobile}
               onSave={(items) => {
                 let hid = nextHid;
@@ -6083,7 +6087,7 @@ export default function GalleryApp() {
                   setAF("tax_credit", rnd(tax*creditRate));
                 }}/></Field>
                 <Field label="発表価格 (円)"><PriceInput value={artworkForm.announce_price} onChange={v=>setAF("announce_price",v)}/></Field>
-                <Field label="仕入日"><input style={S.formInput} type="date" value={artworkForm.purchased_at} onChange={e=>{
+                <Field label="仕入日"><input style={{...S.formInput,WebkitAppearance:"none",appearance:"none"}} type="date" value={artworkForm.purchased_at} onChange={e=>{
                   setAF("purchased_at",e.target.value);
                   const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
                   const inv = sup?.invoice_no && e.target.value
@@ -6804,7 +6808,7 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
   const filtered = [...artists]
     .sort((a,b)=>a.name_kana.localeCompare(b.name_kana,"ja"))
     .filter(a=>{
-      const nq = q.toLowerCase().replace(/[\s\u3000]+/g,"");
+      const nq = hiraToKata(q).toLowerCase().replace(/[\s\u3000]+/g,"");
       return !nq||[a.name,a.name_kana].some(s=>(s||"").toLowerCase().replace(/[\s\u3000]+/g,"").includes(nq));
     });
 
@@ -6895,7 +6899,7 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
 
 
 // ─── 売上登録フォーム ─────────────────────────────────────
-function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], onSave, isMobile=false }) {
+function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxSettings, onSave, isMobile=false }) {
   const fmt   = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "—";
   const toDay = () => new Date().toISOString().slice(0,10);
   const TAX_RATE = 0.10;
@@ -9075,7 +9079,7 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
   const [cursor, setCursor] = useState(-1);
   const listRef = useRef<HTMLDivElement>(null);
   const filtered = counterparties.filter(c => {
-    const nq = q.toLowerCase().replace(/[\s\u3000]+/g,"");
+    const nq = hiraToKata(q).toLowerCase().replace(/[\s\u3000]+/g,"");
     return !nq || [c.name, c.company, c.name_kana].some(s => (s||"").toLowerCase().replace(/[\s\u3000]+/g,"").includes(nq));
   });
   const cpDisplayName = (cp) => cp ? (cp.name || cp.company || "—") : "—";
