@@ -4924,7 +4924,7 @@ export default function GalleryApp() {
   };
 
   // ── フォーム状態 ──
-  const emptyArtwork = { title:"", artist:"", artist_id:null, artist_kana:"", medium:"", size:"", appraisal:"", purchase_price:"", supplier:"", supplier_id:null, announce_price:"", purchased_at:"", memo:"", tax_credit:"" };
+  const emptyArtwork = { title:"", artist:"", artist_id:null, artist_kana:"", medium:"", size:"", appraisal:"", purchase_price:"", supplier:"", supplier_id:null, announce_price:"", purchased_at:"", memo:"", tax_credit:"", purchase_tax:"" };
   const [artworkForm, setArtworkForm] = useState(emptyArtwork);
   const setAF = (k,v) => setArtworkForm(p=>({...p,[k]:v}));
 
@@ -5019,6 +5019,7 @@ export default function GalleryApp() {
     const ev = { id:nextHid, artwork_id:artwork_id, event_type:"purchase", old_price:null, new_price:pp,
       counterparty:artworkForm.supplier, counterparty_id:artworkForm.supplier_id,
       memo:artworkForm.memo||"仕入", created_at:dt,
+      purchase_tax: artworkForm.purchase_tax!=="" ? Number(artworkForm.purchase_tax) : null,
       tax_credit: artworkForm.tax_credit!=="" ? Number(artworkForm.tax_credit) : null };
     setArtworks(p=>[...p,nw]); setHistory(p=>[...p,ev]);
     setNextHid(p=>p+1);
@@ -5364,13 +5365,18 @@ export default function GalleryApp() {
                       ✏ 作品情報を編集
                     </button>
                   )}
-                  <TxBlock color="#60a5fa" title="仕入">
-                    <TxRow label="仕入先" val={selected.supplier_id
-                      ? <button style={S.cpLink} onClick={()=>{setSelectedCpId(selected.supplier_id);setView("cp_detail");}}>{selected.supplier}</button>
-                      : selected.supplier} />
-                    <TxRow label="仕入価格" val={fmt(selected.purchase_price)} />
-                    <TxRow label="仕入日"   val={selected.purchased_at} />
-                  </TxBlock>
+                  <TxBlock color="#60a5fa" title="仕入">{(() => {
+                    const ph = history.filter(h=>h.artwork_id===selected.artwork_id&&h.event_type==="purchase").slice(-1)[0];
+                    return (<>
+                      <TxRow label="仕入日"   val={selected.purchased_at} />
+                      <TxRow label="仕入先" val={selected.supplier_id
+                        ? <button style={S.cpLink} onClick={()=>{setSelectedCpId(selected.supplier_id);setView("cp_detail");}}>{selected.supplier}</button>
+                        : selected.supplier} />
+                      <TxRow label="仕入価格" val={fmt(selected.purchase_price)} />
+                      {ph?.purchase_tax!=null && <TxRow label="消費税額" val={fmt(ph.purchase_tax)} />}
+                      {ph?.tax_credit!=null && <TxRow label="控除税額" val={fmt(ph.tax_credit)} />}
+                    </>);
+                  })()}</TxBlock>
                   <TxBlock color="#a78bfa" title="発表価格">
                     {editingDetailField==="price" ? (
                       <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
@@ -6068,17 +6074,46 @@ export default function GalleryApp() {
               </div>
               <div style={{...S.formSectionTitle,marginTop:20}}>仕入情報</div>
               <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
-                <Field label="仕入先">
+                <Field label="仕入日" fullWidth>
+                  <input style={{...S.formInput,WebkitAppearance:"none",appearance:"none",maxWidth:180}} type="date" value={artworkForm.purchased_at} onChange={e=>{
+                    setAF("purchased_at",e.target.value);
+                    const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
+                    const inv = sup?.invoice_no && e.target.value
+                      ? (e.target.value>=sup.invoice_from && (!sup.invoice_to||e.target.value<=sup.invoice_to))
+                      : false;
+                    const rate = getTaxRate(e.target.value, taxSettings.rates);
+                    const creditRate = getPurchaseCreditRate(e.target.value, inv, taxSettings);
+                    const rnd = roundFn(taxSettings.rounding||"floor");
+                    const p = Number(artworkForm.purchase_price)||0;
+                    const tax = p - rnd(p/(1+rate));
+                    setAF("tax_credit", rnd(tax*creditRate));
+                    setAF("purchase_tax", tax);
+                  }}/>
+                </Field>
+                <Field label="仕入先" fullWidth>
                   <CpSelect
                     value={artworkForm.supplier} cpId={artworkForm.supplier_id}
                     counterparties={counterparties}
-                    onChange={(name,id)=>setArtworkForm(p=>({...p,supplier:name,supplier_id:id}))}
+                    onChange={(name,id)=>{
+                      setArtworkForm(p=>({...p,supplier:name,supplier_id:id}));
+                      // 仕入先変更時に控除税額を再計算
+                      const sup = counterparties.find(c=>c.cp_id===id);
+                      const inv = sup?.invoice_no && artworkForm.purchased_at
+                        ? (artworkForm.purchased_at>=sup.invoice_from && (!sup.invoice_to||artworkForm.purchased_at<=sup.invoice_to))
+                        : false;
+                      const rate = getTaxRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), taxSettings.rates);
+                      const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
+                      const rnd = roundFn(taxSettings.rounding||"floor");
+                      const p = Number(artworkForm.purchase_price)||0;
+                      const tax = p - rnd(p/(1+rate));
+                      setAF("tax_credit", rnd(tax*creditRate));
+                      setAF("purchase_tax", tax);
+                    }}
                     onQuickRegister={quickRegisterCp}
                   />
                 </Field>
                 <Field label="仕入価格 (円)"><PriceInput value={artworkForm.purchase_price} onChange={v=>{
                   setAF("purchase_price",v);
-                  // 仕入先のインボイス登録状況から控除税額を自動計算
                   const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
                   const inv = sup?.invoice_no && artworkForm.purchased_at
                     ? (artworkForm.purchased_at>=sup.invoice_from && (!sup.invoice_to||artworkForm.purchased_at<=sup.invoice_to))
@@ -6087,28 +6122,19 @@ export default function GalleryApp() {
                   const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
                   const rnd = roundFn(taxSettings.rounding||"floor");
                   const tax = v - rnd(v/(1+rate));
+                  setAF("purchase_tax", tax);
                   setAF("tax_credit", rnd(tax*creditRate));
                 }}/></Field>
-                <Field label="発表価格 (円)"><PriceInput value={artworkForm.announce_price} onChange={v=>setAF("announce_price",v)}/></Field>
-                <Field label="仕入日"><input style={{...S.formInput,WebkitAppearance:"none",appearance:"none"}} type="date" value={artworkForm.purchased_at} onChange={e=>{
-                  setAF("purchased_at",e.target.value);
-                  const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
-                  const inv = sup?.invoice_no && e.target.value
-                    ? (e.target.value>=sup.invoice_from && (!sup.invoice_to||e.target.value<=sup.invoice_to))
-                    : false;
-                  const rate = getTaxRate(e.target.value, taxSettings.rates);
-                  const creditRate = getPurchaseCreditRate(e.target.value, inv, taxSettings);
-                  const rnd = roundFn(taxSettings.rounding||"floor");
-                  const p = Number(artworkForm.purchase_price)||0;
-                  const tax = p - rnd(p/(1+rate));
-                  setAF("tax_credit", rnd(tax*creditRate));
-                }}/></Field>
+                <Field label="消費税額 (円)">
+                  <PriceInput value={artworkForm.purchase_tax??""} onChange={v=>setAF("purchase_tax",v)} placeholder="自動計算（手修正可）"/>
+                </Field>
                 <Field label="控除税額 (円)">
                   <PriceInput value={artworkForm.tax_credit??""} onChange={v=>setAF("tax_credit",v)} placeholder="自動計算（手修正可）"/>
                   <div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginTop:3}}>
-                    仕入先のインボイス登録状況と仕入日から自動計算。手修正可。
+                    インボイス登録状況と仕入日から自動計算。手修正可。
                   </div>
                 </Field>
+                <Field label="発表価格 (円)"><PriceInput value={artworkForm.announce_price} onChange={v=>setAF("announce_price",v)}/></Field>
                 <Field label="仕入メモ" fullWidth><input style={S.formInput} placeholder="経緯・備考など" value={artworkForm.memo} onChange={e=>setAF("memo",e.target.value)}/></Field>
               </div>
               <button style={{...S.submitBtn,...(!artworkForm.title||!artworkForm.artist?S.submitDisabled:{})}}
@@ -6905,7 +6931,7 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
 function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxSettings, onSave, isMobile=false }) {
   const fmt   = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "—";
   const toDay = () => new Date().toISOString().slice(0,10);
-  const TAX_RATE = 0.10;
+  const TAX_RATE = getTaxRate(new Date().toISOString().slice(0,10), taxSettings?.rates||[]);
 
   const [soldDate,      setSoldDate]      = useState(toDay());
   const [buyerName,     setBuyerName]     = useState("");
@@ -7501,7 +7527,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
   const [cpOpen,      setCpOpen]      = useState(false);
   const [cpQ,         setCpQ]         = useState("");
 
-  const TAX_RATE = 0.10;
+  const TAX_RATE = getTaxRate(new Date().toISOString().slice(0,10), taxSettings?.rates||[]);
   const calcTax  = (p) => { const n=Number(p)||0; const rnd=roundFn(taxSettings?.rounding||"floor"); return n - rnd(n / (1 + TAX_RATE)); };
 
   const filteredCps = counterparties.filter(c =>
@@ -8514,11 +8540,12 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
         ? -((h.new_price||0) - (h.old_price||0))
         : (h.old_price||0) - (h.new_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
-      const excl        = Math.floor(discountAmt / (1 + taxRate));
+      const rnd         = roundFn(taxSettings.rounding||"floor");
+      const excl        = rnd(discountAmt / (1 + taxRate));
       const tax         = discountAmt - excl;
       const inv         = hasInvoice(h.counterparty_id, date);
       const creditRate  = getPurchaseCreditRate(date, inv, taxSettings);
-      const taxCredit   = Math.floor(tax * creditRate);
+      const taxCredit   = rnd(tax * creditRate);
       return { h, artwork, discountAmt, excl, tax, taxCredit, inv, creditRate, isDiscount: true };
     });
 
@@ -8526,12 +8553,13 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const artwork    = artworks.find(a => a.artwork_id === h.artwork_id);
       const price      = h.new_price || 0;
       const salesRate  = getTaxRate(date, taxSettings.rates);
-      const excl       = Math.floor(price / (1 + salesRate));
+      const rnd        = roundFn(taxSettings.rounding||"floor");
+      const excl       = rnd(price / (1 + salesRate));
       const tax        = price - excl;
       const cost       = artwork?.purchase_price || 0;
       const purchaseDate = artwork?.purchased_at || date;
       const purchRate  = getTaxRate(purchaseDate, taxSettings.rates);
-      const costExcl   = Math.floor(cost / (1 + purchRate));
+      const costExcl   = rnd(cost / (1 + purchRate));
       const profitLoss = excl - costExcl;
       return { h, artwork, price, excl, tax, cost, costExcl, profitLoss, isDiscount: false };
     });
@@ -8541,11 +8569,12 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const artwork     = artworks.find(a => a.artwork_id === h.artwork_id);
       const increaseAmt = (h.new_price||0) - (h.old_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
-      const excl        = Math.floor(increaseAmt / (1 + taxRate));
+      const rnd         = roundFn(taxSettings.rounding||"floor");
+      const excl        = rnd(increaseAmt / (1 + taxRate));
       const tax         = increaseAmt - excl;
       const inv         = hasInvoice(h.counterparty_id, date);
       const creditRate  = getPurchaseCreditRate(date, inv, taxSettings);
-      const taxCredit   = Math.floor(tax * creditRate);
+      const taxCredit   = rnd(tax * creditRate);
       return { h, artwork, increaseAmt, excl, tax, taxCredit, inv, creditRate };
     });
 
@@ -8554,7 +8583,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const artwork     = artworks.find(a => a.artwork_id === h.artwork_id);
       const discountAmt = (h.old_price||0) - (h.new_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
-      const excl        = Math.floor(discountAmt / (1 + taxRate));
+      const rnd         = roundFn(taxSettings.rounding||"floor");
+      const excl        = rnd(discountAmt / (1 + taxRate));
       const tax         = discountAmt - excl;
       return { h, artwork, discountAmt, excl, tax };
     });
@@ -8564,7 +8594,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const artwork     = artworks.find(a => a.artwork_id === h.artwork_id);
       const increaseAmt = (h.new_price||0) - (h.old_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
-      const excl        = Math.floor(increaseAmt / (1 + taxRate));
+      const rnd         = roundFn(taxSettings.rounding||"floor");
+      const excl        = rnd(increaseAmt / (1 + taxRate));
       const tax         = increaseAmt - excl;
       return { h, artwork, increaseAmt, excl, tax };
     });
