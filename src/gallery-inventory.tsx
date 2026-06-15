@@ -231,9 +231,9 @@ const roundFn = (rounding: string) => {
 };
 const calcTax = (taxIncPrice, rate, rounding="floor") => {
   if (!taxIncPrice) return { excl: 0, tax: 0 };
-  const fn   = roundFn(rounding);
-  const excl = fn(taxIncPrice / (1 + rate));
-  const tax  = taxIncPrice - excl;
+  const fn  = roundFn(rounding);
+  const tax = fn(taxIncPrice - taxIncPrice / (1 + rate));
+  const excl = taxIncPrice - tax;
   return { excl, tax };
 };
 
@@ -352,11 +352,11 @@ const initialArtworks = [
 ];
 
 const initialHistory = [
-  { id: 1, artwork_id: "25EA001", event_type: "purchase", old_price: null,   new_price: 280000, counterparty: "田中 誠",       counterparty_id: "0001", memo: "アトリエ直接仕入",      created_at: "2024-11-10" },
-  { id: 2, artwork_id: "2493001", event_type: "purchase", old_price: null,   new_price: 95000,  counterparty: "銀座アートギャラリー・壱番館", counterparty_id: "0015", memo: "グループ展より引き取り", created_at: "2024-09-03" },
+  { id: 1, artwork_id: "25EA001", event_type: "purchase", old_price: null,   new_price: 280000, counterparty: "田中 誠",       counterparty_id: "0001", memo: "アトリエ直接仕入",      created_at: "2024-11-10", purchase_tax: 25454, tax_credit: 25454 },
+  { id: 2, artwork_id: "2493001", event_type: "purchase", old_price: null,   new_price: 95000,  counterparty: "銀座アートギャラリー・壱番館", counterparty_id: "0015", memo: "グループ展より引き取り", created_at: "2024-09-03", purchase_tax: 8636,  tax_credit: 8636  },
   { id: 3, artwork_id: "2493001", event_type: "sold_discount", old_price: 220000, new_price: 200000, counterparty: "田村 一郎",     counterparty_id: "0002", memo: "顧客交渉により値引き",  created_at: "2025-01-15" },
   { id: 4, artwork_id: "2493001", event_type: "sold",     old_price: null,   new_price: 200000, counterparty: "田村 一郎",     counterparty_id: "0002", memo: "田村様コレクションへ",  created_at: "2025-01-15" },
-  { id: 5, artwork_id: "251K001", event_type: "purchase", old_price: null,   new_price: 150000, counterparty: "山本 竜",       counterparty_id: "0004", memo: "直接購入",              created_at: "2025-01-20" },
+  { id: 5, artwork_id: "251K001", event_type: "purchase", old_price: null,   new_price: 150000, counterparty: "山本 竜",       counterparty_id: "0004", memo: "直接購入",              created_at: "2025-01-20", purchase_tax: 13636, tax_credit: 13636 },
   { id: 6, artwork_id: "251K001", event_type: "consign",  old_price: null,   new_price: 300000, counterparty: "ホテル椿山荘",  counterparty_id: "0003", memo: "ロビー展示",            created_at: "2025-03-01" },
 ];
 
@@ -2773,7 +2773,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-06-16"
+        created_at: "2025-06-16",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 8,
@@ -2784,7 +2785,8 @@ const additionalHistory = [
         counterparty: "オークションハウス・セントラル",
         counterparty_id: "0012",
         memo: "仕入",
-        created_at: "2025-06-10"
+        created_at: "2025-06-10",
+        purchase_tax: 27272, tax_credit: 21817
     },
   {
         id: 9,
@@ -2795,7 +2797,8 @@ const additionalHistory = [
         counterparty: "伊藤コレクション",
         counterparty_id: null,
         memo: "成約",
-        created_at: "2026-01-29"
+        created_at: "2026-01-29",
+        purchase_tax: 54545, tax_credit: 54545
     },
   {
         id: 10,
@@ -2806,7 +2809,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-08-28"
+        created_at: "2025-08-28",
+        purchase_tax: 25454, tax_credit: 25454
     },
   {
         id: 11,
@@ -2817,7 +2821,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-08-23"
+        created_at: "2025-08-23",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 12,
@@ -2828,7 +2833,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2025-05-23"
+        created_at: "2025-05-23",
+        purchase_tax: 4545, tax_credit: 3636
     },
   {
         id: 13,
@@ -2839,7 +2845,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2025-09-25"
+        created_at: "2025-09-25",
+        purchase_tax: 45454, tax_credit: 36363
     },
   {
         id: 14,
@@ -2861,7 +2868,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2026-01-05"
+        created_at: "2026-01-05",
+        purchase_tax: 13636, tax_credit: 10908
     },
   {
         id: 16,
@@ -2883,7 +2891,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2025-06-11"
+        created_at: "2025-06-11",
+        purchase_tax: 7272, tax_credit: 5817
     },
   {
         id: 18,
@@ -2894,7 +2903,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2024-09-19"
+        created_at: "2024-09-19",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 19,
@@ -2905,7 +2915,8 @@ const additionalHistory = [
         counterparty: "伊藤コレクション",
         counterparty_id: null,
         memo: "成約",
-        created_at: "2025-06-08"
+        created_at: "2025-06-08",
+        purchase_tax: 22727, tax_credit: 18181
     },
   {
         id: 20,
@@ -2916,7 +2927,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-07-15"
+        created_at: "2025-07-15",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 21,
@@ -2938,7 +2950,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2025-11-28"
+        created_at: "2025-11-28",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 23,
@@ -2982,7 +2995,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2023-08-10"
+        created_at: "2023-08-10",
+        purchase_tax: 22727, tax_credit: 22727
     },
   {
         id: 27,
@@ -2993,7 +3007,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2024-01-04"
+        created_at: "2024-01-04",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 28,
@@ -3004,7 +3019,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2024-10-12"
+        created_at: "2024-10-12",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 29,
@@ -3026,7 +3042,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2023-09-03"
+        created_at: "2023-09-03",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 31,
@@ -3048,7 +3065,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2025-07-12"
+        created_at: "2025-07-12",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 33,
@@ -3070,7 +3088,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2024-05-02"
+        created_at: "2024-05-02",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 35,
@@ -3103,7 +3122,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2025-04-04"
+        created_at: "2025-04-04",
+        purchase_tax: 25454, tax_credit: 25454
     },
   {
         id: 38,
@@ -3136,7 +3156,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2023-08-28"
+        created_at: "2023-08-28",
+        purchase_tax: 18181, tax_credit: 18181
     },
   {
         id: 41,
@@ -3147,7 +3168,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2025-06-26"
+        created_at: "2025-06-26",
+        purchase_tax: 25454, tax_credit: 25454
     },
   {
         id: 42,
@@ -3158,7 +3180,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2024-02-04"
+        created_at: "2024-02-04",
+        purchase_tax: 9090, tax_credit: 9090
     },
   {
         id: 43,
@@ -3191,7 +3214,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2024-05-01"
+        created_at: "2024-05-01",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 46,
@@ -3213,7 +3237,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2023-09-16"
+        created_at: "2023-09-16",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 48,
@@ -3246,7 +3271,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2026-02-04"
+        created_at: "2026-02-04",
+        purchase_tax: 22727, tax_credit: 22727
     },
   {
         id: 51,
@@ -3279,7 +3305,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2026-01-29"
+        created_at: "2026-01-29",
+        purchase_tax: 54545, tax_credit: 54545
     },
   {
         id: 54,
@@ -3290,7 +3317,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2023-10-25"
+        created_at: "2023-10-25",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 55,
@@ -3312,7 +3340,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2024-07-28"
+        created_at: "2024-07-28",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 57,
@@ -3323,7 +3352,8 @@ const additionalHistory = [
         counterparty: "オークションハウス・セントラル",
         counterparty_id: "0012",
         memo: "仕入",
-        created_at: "2025-03-08"
+        created_at: "2025-03-08",
+        purchase_tax: 13636, tax_credit: 10908
     },
   {
         id: 58,
@@ -3356,7 +3386,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2026-02-15"
+        created_at: "2026-02-15",
+        purchase_tax: 9090, tax_credit: 9090
     },
   {
         id: 61,
@@ -3367,7 +3398,8 @@ const additionalHistory = [
         counterparty: "オークションハウス・セントラル",
         counterparty_id: "0012",
         memo: "仕入",
-        created_at: "2024-11-08"
+        created_at: "2024-11-08",
+        purchase_tax: 54545, tax_credit: 43636
     },
   {
         id: 62,
@@ -3389,7 +3421,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2024-01-24"
+        created_at: "2024-01-24",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 64,
@@ -3411,7 +3444,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2025-06-01"
+        created_at: "2025-06-01",
+        purchase_tax: 31818, tax_credit: 25454
     },
   {
         id: 66,
@@ -3422,7 +3456,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2025-02-01"
+        created_at: "2025-02-01",
+        purchase_tax: 9090, tax_credit: 9090
     },
   {
         id: 67,
@@ -3433,7 +3468,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2024-03-25"
+        created_at: "2024-03-25",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 68,
@@ -3455,7 +3491,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2024-12-31"
+        created_at: "2024-12-31",
+        purchase_tax: 9090, tax_credit: 7272
     },
   {
         id: 70,
@@ -3477,7 +3514,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-07-18"
+        created_at: "2025-07-18",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 72,
@@ -3488,7 +3526,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2024-06-27"
+        created_at: "2024-06-27",
+        purchase_tax: 18181, tax_credit: 18181
     },
   {
         id: 73,
@@ -3521,7 +3560,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2025-04-28"
+        created_at: "2025-04-28",
+        purchase_tax: 36363, tax_credit: 29090
     },
   {
         id: 76,
@@ -3532,7 +3572,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2025-07-21"
+        created_at: "2025-07-21",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 77,
@@ -3554,7 +3595,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2024-01-12"
+        created_at: "2024-01-12",
+        purchase_tax: 54545, tax_credit: 43636
     },
   {
         id: 79,
@@ -3576,7 +3618,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2025-03-11"
+        created_at: "2025-03-11",
+        purchase_tax: 9090, tax_credit: 9090
     },
   {
         id: 81,
@@ -3598,7 +3641,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2024-10-01"
+        created_at: "2024-10-01",
+        purchase_tax: 27272, tax_credit: 21817
     },
   {
         id: 83,
@@ -3620,7 +3664,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2025-06-06"
+        created_at: "2025-06-06",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 85,
@@ -3642,7 +3687,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2025-07-19"
+        created_at: "2025-07-19",
+        purchase_tax: 4545, tax_credit: 3636
     },
   {
         id: 87,
@@ -3664,7 +3710,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2024-11-01"
+        created_at: "2024-11-01",
+        purchase_tax: 27272, tax_credit: 27272
     },
   {
         id: 89,
@@ -3675,7 +3722,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2025-03-13"
+        created_at: "2025-03-13",
+        purchase_tax: 4545, tax_credit: 3636
     },
   {
         id: 90,
@@ -3686,7 +3734,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2025-09-25"
+        created_at: "2025-09-25",
+        purchase_tax: 45454, tax_credit: 36363
     },
   {
         id: 91,
@@ -3708,7 +3757,8 @@ const additionalHistory = [
         counterparty: "オークションハウス・セントラル",
         counterparty_id: "0012",
         memo: "仕入",
-        created_at: "2025-01-30"
+        created_at: "2025-01-30",
+        purchase_tax: 4545, tax_credit: 3636
     },
   {
         id: 93,
@@ -3719,7 +3769,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2024-06-06"
+        created_at: "2024-06-06",
+        purchase_tax: 18181, tax_credit: 18181
     },
   {
         id: 94,
@@ -3730,7 +3781,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2026-01-30"
+        created_at: "2026-01-30",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 95,
@@ -3763,7 +3815,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2025-10-28"
+        created_at: "2025-10-28",
+        purchase_tax: 18181, tax_credit: 18181
     },
   {
         id: 98,
@@ -3785,7 +3838,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2024-09-13"
+        created_at: "2024-09-13",
+        purchase_tax: 45454, tax_credit: 36363
     },
   {
         id: 100,
@@ -3796,7 +3850,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2026-01-01"
+        created_at: "2026-01-01",
+        purchase_tax: 4545, tax_credit: 3636
     },
   {
         id: 101,
@@ -3807,7 +3862,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2025-09-26"
+        created_at: "2025-09-26",
+        purchase_tax: 27272, tax_credit: 21817
     },
   {
         id: 102,
@@ -3840,7 +3896,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2023-11-16"
+        created_at: "2023-11-16",
+        purchase_tax: 25454, tax_credit: 25454
     },
   {
         id: 105,
@@ -3851,7 +3908,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2023-08-10"
+        created_at: "2023-08-10",
+        purchase_tax: 22727, tax_credit: 22727
     },
   {
         id: 106,
@@ -3862,7 +3920,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2024-10-27"
+        created_at: "2024-10-27",
+        purchase_tax: 9090, tax_credit: 7272
     },
   {
         id: 107,
@@ -3873,7 +3932,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2024-04-09"
+        created_at: "2024-04-09",
+        purchase_tax: 31818, tax_credit: 25454
     },
   {
         id: 108,
@@ -3895,7 +3955,8 @@ const additionalHistory = [
         counterparty: "アートブリッジ・インターナショナル",
         counterparty_id: "0011",
         memo: "仕入",
-        created_at: "2023-12-14"
+        created_at: "2023-12-14",
+        purchase_tax: 36363, tax_credit: 36363
     },
   {
         id: 110,
@@ -3917,7 +3978,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2024-08-15"
+        created_at: "2024-08-15",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 112,
@@ -3928,7 +3990,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2025-06-30"
+        created_at: "2025-06-30",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 113,
@@ -3950,7 +4013,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2024-07-24"
+        created_at: "2024-07-24",
+        purchase_tax: 9090, tax_credit: 9090
     },
   {
         id: 115,
@@ -3972,7 +4036,8 @@ const additionalHistory = [
         counterparty: "オークションハウス・セントラル",
         counterparty_id: "0012",
         memo: "仕入",
-        created_at: "2025-02-25"
+        created_at: "2025-02-25",
+        purchase_tax: 27272, tax_credit: 21817
     },
   {
         id: 117,
@@ -3994,7 +4059,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2024-09-27"
+        created_at: "2024-09-27",
+        purchase_tax: 18181, tax_credit: 18181
     },
   {
         id: 119,
@@ -4016,7 +4082,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2023-06-05"
+        created_at: "2023-06-05",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 121,
@@ -4038,7 +4105,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2025-08-12"
+        created_at: "2025-08-12",
+        purchase_tax: 25454, tax_credit: 25454
     },
   {
         id: 123,
@@ -4060,7 +4128,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2024-08-29"
+        created_at: "2024-08-29",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 125,
@@ -4071,7 +4140,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2025-05-14"
+        created_at: "2025-05-14",
+        purchase_tax: 27272, tax_credit: 21817
     },
   {
         id: 126,
@@ -4082,7 +4152,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2025-05-28"
+        created_at: "2025-05-28",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 127,
@@ -4104,7 +4175,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2025-09-16"
+        created_at: "2025-09-16",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 129,
@@ -4126,7 +4198,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2025-01-29"
+        created_at: "2025-01-29",
+        purchase_tax: 54545, tax_credit: 54545
     },
   {
         id: 131,
@@ -4137,7 +4210,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2024-05-15"
+        created_at: "2024-05-15",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 132,
@@ -4159,7 +4233,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2025-02-21"
+        created_at: "2025-02-21",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 134,
@@ -4170,7 +4245,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2025-03-16"
+        created_at: "2025-03-16",
+        purchase_tax: 54545, tax_credit: 54545
     },
   {
         id: 135,
@@ -4181,7 +4257,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2024-07-17"
+        created_at: "2024-07-17",
+        purchase_tax: 22727, tax_credit: 18181
     },
   {
         id: 136,
@@ -4203,7 +4280,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2024-06-25"
+        created_at: "2024-06-25",
+        purchase_tax: 36363, tax_credit: 36363
     },
   {
         id: 138,
@@ -4225,7 +4303,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2024-09-16"
+        created_at: "2024-09-16",
+        purchase_tax: 25454, tax_credit: 20363
     },
   {
         id: 140,
@@ -4247,7 +4326,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2024-10-13"
+        created_at: "2024-10-13",
+        purchase_tax: 27272, tax_credit: 21817
     },
   {
         id: 142,
@@ -4258,7 +4338,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2023-07-20"
+        created_at: "2023-07-20",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 143,
@@ -4280,7 +4361,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2024-12-22"
+        created_at: "2024-12-22",
+        purchase_tax: 45454, tax_credit: 45454
     },
   {
         id: 145,
@@ -4302,7 +4384,8 @@ const additionalHistory = [
         counterparty: "オークションハウス・セントラル",
         counterparty_id: "0012",
         memo: "仕入",
-        created_at: "2023-05-30"
+        created_at: "2023-05-30",
+        purchase_tax: 54545, tax_credit: 54545
     },
   {
         id: 147,
@@ -4324,7 +4407,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2024-11-30"
+        created_at: "2024-11-30",
+        purchase_tax: 54545, tax_credit: 43636
     },
   {
         id: 149,
@@ -4346,7 +4430,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2025-02-09"
+        created_at: "2025-02-09",
+        purchase_tax: 7272, tax_credit: 5817
     },
   {
         id: 151,
@@ -4357,7 +4442,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2025-04-24"
+        created_at: "2025-04-24",
+        purchase_tax: 25454, tax_credit: 20363
     },
   {
         id: 152,
@@ -4368,7 +4454,8 @@ const additionalHistory = [
         counterparty: "ガレリア・ヴィスタ",
         counterparty_id: "0008",
         memo: "仕入",
-        created_at: "2025-11-18"
+        created_at: "2025-11-18",
+        purchase_tax: 4545, tax_credit: 4545
     },
   {
         id: 153,
@@ -4401,7 +4488,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-01-29"
+        created_at: "2025-01-29",
+        purchase_tax: 7272, tax_credit: 7272
     },
   {
         id: 156,
@@ -4423,7 +4511,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2023-08-02"
+        created_at: "2023-08-02",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 158,
@@ -4445,7 +4534,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2024-08-22"
+        created_at: "2024-08-22",
+        purchase_tax: 13636, tax_credit: 10908
     },
   {
         id: 160,
@@ -4467,7 +4557,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2023-05-23"
+        created_at: "2023-05-23",
+        purchase_tax: 4545, tax_credit: 4545
     },
   {
         id: 162,
@@ -4489,7 +4580,8 @@ const additionalHistory = [
         counterparty: "シンワオークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
-        created_at: "2025-01-05"
+        created_at: "2025-01-05",
+        purchase_tax: 13636, tax_credit: 13636
     },
   {
         id: 164,
@@ -4511,7 +4603,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2025-06-08"
+        created_at: "2025-06-08",
+        purchase_tax: 22727, tax_credit: 18181
     },
   {
         id: 166,
@@ -4533,7 +4626,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2023-12-15"
+        created_at: "2023-12-15",
+        purchase_tax: 18181, tax_credit: 14544
     },
   {
         id: 168,
@@ -4555,7 +4649,8 @@ const additionalHistory = [
         counterparty: "銀座アートギャラリー・壱番館",
         counterparty_id: "0015",
         memo: "仕入",
-        created_at: "2024-09-05"
+        created_at: "2024-09-05",
+        purchase_tax: 31818, tax_credit: 31818
     },
   {
         id: 170,
@@ -4588,7 +4683,8 @@ const additionalHistory = [
         counterparty: "銀座アートコレクティブ",
         counterparty_id: "0009",
         memo: "仕入",
-        created_at: "2025-05-10"
+        created_at: "2025-05-10",
+        purchase_tax: 7272, tax_credit: 5817
     },
   {
         id: 173,
@@ -4599,7 +4695,8 @@ const additionalHistory = [
         counterparty: "田中アトリエ",
         counterparty_id: "0006",
         memo: "仕入",
-        created_at: "2025-10-19"
+        created_at: "2025-10-19",
+        purchase_tax: 9090, tax_credit: 9090
     },
   {
         id: 174,
@@ -4610,7 +4707,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2024-05-28"
+        created_at: "2024-05-28",
+        purchase_tax: 22727, tax_credit: 18181
     },
   {
         id: 175,
@@ -4632,7 +4730,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2024-10-14"
+        created_at: "2024-10-14",
+        purchase_tax: 25454, tax_credit: 25454
     },
   {
         id: 177,
@@ -4643,7 +4742,8 @@ const additionalHistory = [
         counterparty: "アート大阪実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
-        created_at: "2024-08-25"
+        created_at: "2024-08-25",
+        purchase_tax: 18181, tax_credit: 18181
     },
   {
         id: 178,
@@ -4654,7 +4754,8 @@ const additionalHistory = [
         counterparty: "スペース・ムー",
         counterparty_id: "0010",
         memo: "仕入",
-        created_at: "2024-03-18"
+        created_at: "2024-03-18",
+        purchase_tax: 7272, tax_credit: 5817
     },
   {
         id: 179,
@@ -4687,7 +4788,8 @@ const additionalHistory = [
         counterparty: "アトリエ・ノルド",
         counterparty_id: "0014",
         memo: "仕入",
-        created_at: "2024-08-14"
+        created_at: "2024-08-14",
+        purchase_tax: 9090, tax_credit: 7272
     },
   {
         id: 182,
@@ -6085,7 +6187,7 @@ export default function GalleryApp() {
                     const creditRate = getPurchaseCreditRate(e.target.value, inv, taxSettings);
                     const rnd = roundFn(taxSettings.rounding||"floor");
                     const p = Number(artworkForm.purchase_price)||0;
-                    const tax = p - rnd(p/(1+rate));
+                    const tax = rnd(p - p/(1+rate));
                     setAF("tax_credit", rnd(tax*creditRate));
                     setAF("purchase_tax", tax);
                   }}/>
@@ -6105,7 +6207,7 @@ export default function GalleryApp() {
                       const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
                       const rnd = roundFn(taxSettings.rounding||"floor");
                       const p = Number(artworkForm.purchase_price)||0;
-                      const tax = p - rnd(p/(1+rate));
+                      const tax = rnd(p - p/(1+rate));
                       setAF("tax_credit", rnd(tax*creditRate));
                       setAF("purchase_tax", tax);
                     }}
@@ -6121,7 +6223,7 @@ export default function GalleryApp() {
                   const rate = getTaxRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), taxSettings.rates);
                   const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
                   const rnd = roundFn(taxSettings.rounding||"floor");
-                  const tax = v - rnd(v/(1+rate));
+                  const tax = rnd(v - v/(1+rate));
                   setAF("purchase_tax", tax);
                   setAF("tax_credit", rnd(tax*creditRate));
                 }}/></Field>
@@ -6981,7 +7083,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
   const calcTax = (price, rate) => {
     const p = Number(price)||0;
     const rnd = roundFn(taxSettings?.rounding||"floor");
-    return p - rnd(p / (1 + rate));
+    return rnd(p - p / (1 + rate));
   };
 
   const toggleItem = (a) => {
@@ -7325,7 +7427,7 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
 
   const handleSave = () => {
     const sortedRates = [...rates].sort((a,b)=>a.from.localeCompare(b.from));
-    onSave({ rates: sortedRates, transitionalRates: transitional });
+    onSave({ rates: sortedRates, transitionalRates: transitional, rounding });
     setRates(sortedRates); setSaved(true);
     setTimeout(()=>setSaved(false), 2500);
   };
@@ -7528,7 +7630,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
   const [cpQ,         setCpQ]         = useState("");
 
   const TAX_RATE = getTaxRate(new Date().toISOString().slice(0,10), taxSettings?.rates||[]);
-  const calcTax  = (p) => { const n=Number(p)||0; const rnd=roundFn(taxSettings?.rounding||"floor"); return n - rnd(n / (1 + TAX_RATE)); };
+  const calcTax  = (p) => { const n=Number(p)||0; const rnd=roundFn(taxSettings?.rounding||"floor"); return rnd(n - n / (1 + TAX_RATE)); };
 
   const filteredCps = counterparties.filter(c =>
     !cpQ || [c.name,c.company].some(s=>(s||"").toLowerCase().includes(cpQ.toLowerCase()))
@@ -8523,8 +8625,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const price      = h.new_price || 0;
       const taxRate    = getTaxRate(date, taxSettings.rates);
       const rnd        = roundFn(taxSettings.rounding||"floor");
-      const excl       = rnd(price / (1 + taxRate));
-      const tax        = price - excl;
+      const tax        = rnd(price - price / (1 + taxRate));
+      const excl       = price - tax;
       const inv        = hasInvoice(h.counterparty_id, date);
       const creditRate = getPurchaseCreditRate(date, inv, taxSettings);
       // historyにtax_creditが保存されていれば優先使用
@@ -8541,8 +8643,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
         : (h.old_price||0) - (h.new_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
       const rnd         = roundFn(taxSettings.rounding||"floor");
-      const excl        = rnd(discountAmt / (1 + taxRate));
-      const tax         = discountAmt - excl;
+      const tax         = rnd(discountAmt - discountAmt / (1 + taxRate));
+      const excl        = discountAmt - tax;
       const inv         = hasInvoice(h.counterparty_id, date);
       const creditRate  = getPurchaseCreditRate(date, inv, taxSettings);
       const taxCredit   = rnd(tax * creditRate);
@@ -8554,12 +8656,12 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const price      = h.new_price || 0;
       const salesRate  = getTaxRate(date, taxSettings.rates);
       const rnd        = roundFn(taxSettings.rounding||"floor");
-      const excl       = rnd(price / (1 + salesRate));
-      const tax        = price - excl;
+      const tax        = rnd(price - price / (1 + salesRate));
+      const excl       = price - tax;
       const cost       = artwork?.purchase_price || 0;
       const purchaseDate = artwork?.purchased_at || date;
       const purchRate  = getTaxRate(purchaseDate, taxSettings.rates);
-      const costExcl   = rnd(cost / (1 + purchRate));
+      const costExcl   = rnd(cost - cost / (1 + purchRate));
       const profitLoss = excl - costExcl;
       return { h, artwork, price, excl, tax, cost, costExcl, profitLoss, isDiscount: false };
     });
@@ -8570,8 +8672,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const increaseAmt = (h.new_price||0) - (h.old_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
       const rnd         = roundFn(taxSettings.rounding||"floor");
-      const excl        = rnd(increaseAmt / (1 + taxRate));
-      const tax         = increaseAmt - excl;
+      const tax         = rnd(increaseAmt - increaseAmt / (1 + taxRate));
+      const excl        = increaseAmt - tax;
       const inv         = hasInvoice(h.counterparty_id, date);
       const creditRate  = getPurchaseCreditRate(date, inv, taxSettings);
       const taxCredit   = rnd(tax * creditRate);
@@ -8584,8 +8686,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const discountAmt = (h.old_price||0) - (h.new_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
       const rnd         = roundFn(taxSettings.rounding||"floor");
-      const excl        = rnd(discountAmt / (1 + taxRate));
-      const tax         = discountAmt - excl;
+      const tax         = rnd(discountAmt - discountAmt / (1 + taxRate));
+      const excl        = discountAmt - tax;
       return { h, artwork, discountAmt, excl, tax };
     });
 
@@ -8595,8 +8697,8 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const increaseAmt = (h.new_price||0) - (h.old_price||0);
       const taxRate     = getTaxRate(date, taxSettings.rates);
       const rnd         = roundFn(taxSettings.rounding||"floor");
-      const excl        = rnd(increaseAmt / (1 + taxRate));
-      const tax         = increaseAmt - excl;
+      const tax         = rnd(increaseAmt - increaseAmt / (1 + taxRate));
+      const excl        = increaseAmt - tax;
       return { h, artwork, increaseAmt, excl, tax };
     });
 
