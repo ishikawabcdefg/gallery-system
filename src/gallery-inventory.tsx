@@ -4913,7 +4913,11 @@ export default function GalleryApp() {
   const [nextConsignmentId, setNextConsignmentId] = useState(() => loadLS("gallery_nextConsignmentId", 6));
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const mainRef = useRef<HTMLElement>(null);
+  const [saleFormKey, setSaleFormKey] = useState(0);
   const navigateTo = (v: string) => {
+    // 仕入・売上登録フォームから離れる場合は入力内容をリセット
+    if (view === "add_artwork") setArtworkForm(emptyArtwork);
+    if (view === "add_sale") setSaleFormKey(k => k + 1);
     setView(v);
     setTimeout(() => { mainRef.current?.scrollTo(0, 0); }, 0);
   };
@@ -4948,6 +4952,9 @@ export default function GalleryApp() {
       input[type=number]::-webkit-inner-spin-button,
       input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       input[type=number] { -moz-appearance: textfield; }
+      input::placeholder, textarea::placeholder { color: #4a4a6a !important; opacity: 1; }
+      input::-webkit-input-placeholder, textarea::-webkit-input-placeholder { color: #4a4a6a !important; }
+      input::-moz-placeholder, textarea::-moz-placeholder { color: #4a4a6a !important; opacity: 1; }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -5026,7 +5033,7 @@ export default function GalleryApp() {
   };
 
   // ── フォーム状態 ──
-  const emptyArtwork = { title:"", artist:"", artist_id:null, artist_kana:"", medium:"", size:"", appraisal:"", purchase_price:"", supplier:"", supplier_id:null, announce_price:"", purchased_at:"", memo:"", tax_credit:"", purchase_tax:"" };
+  const emptyArtwork = { title:"", artist:"", artist_id:null, artist_kana:"", medium:"", size:"", appraisal:"", purchase_price:"", supplier:"", supplier_id:null, announce_price:"", purchased_at:"", memo:"", tax_credit:"", purchase_tax:"", creditRate:1.0 };
   const [artworkForm, setArtworkForm] = useState(emptyArtwork);
   const setAF = (k,v) => setArtworkForm(p=>({...p,[k]:v}));
 
@@ -5288,12 +5295,12 @@ export default function GalleryApp() {
               </button>
             ))}
             <div style={S.navDivider}/>
-            <button style={{...S.navItem,...S.navAdd}} onClick={()=>setView("add_artwork")}
+            <button style={{...S.navItem,...S.navAdd}} onClick={()=>navigateTo("add_artwork")}
               onMouseEnter={e=>{ e.currentTarget.style.background="#241540"; }}
               onMouseLeave={e=>{ e.currentTarget.style.background="#1a1030"; }}>
               <span style={S.navIcon}>＋</span>仕入を登録
             </button>
-            <button style={{...S.navItem,...S.navAdd2}} onClick={()=>setView("add_sale")}
+            <button style={{...S.navItem,...S.navAdd2}} onClick={()=>navigateTo("add_sale")}
               onMouseEnter={e=>{ e.currentTarget.style.background="#0a2030"; }}
               onMouseLeave={e=>{ e.currentTarget.style.background="#0a1a20"; }}>
               <span style={S.navIcon}>＋</span>売上を登録
@@ -6115,9 +6122,10 @@ export default function GalleryApp() {
         {/* ══ 売上登録 ══ */}
         {view==="add_sale" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
-            <button style={S.backBtn} onClick={()=>setView("inventory")}>← 戻る</button>
+            <button style={S.backBtn} onClick={()=>navigateTo("inventory")}>← 戻る</button>
             <h1 style={S.pageTitle}>売上を登録</h1>
             <SaleForm
+              key={saleFormKey}
               artworks={artworks}
               counterparties={counterparties}
               artists={artists}
@@ -6155,7 +6163,7 @@ export default function GalleryApp() {
         {/* ══ 作品登録フォーム ══ */}
         {view==="add_artwork" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
-            <button style={S.backBtn} onClick={()=>setView("list")}>← 戻る</button>
+            <button style={S.backBtn} onClick={()=>navigateTo("list")}>← 戻る</button>
             <h1 style={S.pageTitle}>仕入を登録</h1>
             <div style={S.formCard}>
               <div style={S.formSectionTitle}>作品情報</div>
@@ -6188,16 +6196,21 @@ export default function GalleryApp() {
                     const rnd = roundFn(taxSettings.rounding||"floor");
                     const p = Number(artworkForm.purchase_price)||0;
                     const tax = rnd(p - p/(1+rate));
-                    setAF("tax_credit", rnd(tax*creditRate));
-                    setAF("purchase_tax", tax);
+                    const taxAfterCredit = rnd(tax*creditRate);
+                    setArtworkForm(prev=>({...prev, purchase_tax: taxAfterCredit, tax_credit: taxAfterCredit, creditRate }));
                   }}/>
                 </Field>
-                <Field label="仕入先" fullWidth>
+                <Field label="仕入先" fullWidth badge={
+                  artworkForm.supplier_id && artworkForm.creditRate != null && artworkForm.creditRate < 1 ? (
+                    <span style={{fontSize:11,color:"#f87171",background:"rgba(248,113,113,0.12)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"sans-serif"}}>
+                      免税事業者
+                    </span>
+                  ) : undefined
+                }>
                   <CpSelect
                     value={artworkForm.supplier} cpId={artworkForm.supplier_id}
                     counterparties={counterparties}
                     onChange={(name,id)=>{
-                      setArtworkForm(p=>({...p,supplier:name,supplier_id:id}));
                       // 仕入先変更時に控除税額を再計算
                       const sup = counterparties.find(c=>c.cp_id===id);
                       const inv = sup?.invoice_no && artworkForm.purchased_at
@@ -6208,14 +6221,13 @@ export default function GalleryApp() {
                       const rnd = roundFn(taxSettings.rounding||"floor");
                       const p = Number(artworkForm.purchase_price)||0;
                       const tax = rnd(p - p/(1+rate));
-                      setAF("tax_credit", rnd(tax*creditRate));
-                      setAF("purchase_tax", tax);
+                      const taxAfterCredit = rnd(tax*creditRate);
+                      setArtworkForm(prev=>({...prev, supplier:name, supplier_id:id, purchase_tax: taxAfterCredit, tax_credit: taxAfterCredit, creditRate }));
                     }}
                     onQuickRegister={quickRegisterCp}
                   />
                 </Field>
                 <Field label="仕入価格 (円)"><PriceInput value={artworkForm.purchase_price} onChange={v=>{
-                  setAF("purchase_price",v);
                   const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
                   const inv = sup?.invoice_no && artworkForm.purchased_at
                     ? (artworkForm.purchased_at>=sup.invoice_from && (!sup.invoice_to||artworkForm.purchased_at<=sup.invoice_to))
@@ -6224,17 +6236,17 @@ export default function GalleryApp() {
                   const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
                   const rnd = roundFn(taxSettings.rounding||"floor");
                   const tax = rnd(v - v/(1+rate));
-                  setAF("purchase_tax", tax);
-                  setAF("tax_credit", rnd(tax*creditRate));
+                  const taxAfterCredit = rnd(tax*creditRate);
+                  setArtworkForm(prev=>({...prev, purchase_price:v, purchase_tax: taxAfterCredit, tax_credit: taxAfterCredit, creditRate }));
                 }}/></Field>
-                <Field label="消費税額 (円)">
+                <Field label="消費税額 (円)" badge={
+                  artworkForm.creditRate != null && artworkForm.creditRate < 1 ? (
+                    <span style={{fontSize:11,color:"#38bdf8",background:"rgba(56,189,248,0.12)",border:"1px solid rgba(56,189,248,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"sans-serif"}}>
+                      控{Math.round((artworkForm.creditRate??1)*100)}
+                    </span>
+                  ) : undefined
+                }>
                   <PriceInput value={artworkForm.purchase_tax??""} onChange={v=>setAF("purchase_tax",v)} placeholder="自動計算（手修正可）"/>
-                </Field>
-                <Field label="控除税額 (円)">
-                  <PriceInput value={artworkForm.tax_credit??""} onChange={v=>setAF("tax_credit",v)} placeholder="自動計算（手修正可）"/>
-                  <div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginTop:3}}>
-                    インボイス登録状況と仕入日から自動計算。手修正可。
-                  </div>
                 </Field>
                 <Field label="発表価格 (円)"><PriceInput value={artworkForm.announce_price} onChange={v=>setAF("announce_price",v)}/></Field>
                 <Field label="仕入メモ" fullWidth><input style={S.formInput} placeholder="経緯・備考など" value={artworkForm.memo} onChange={e=>setAF("memo",e.target.value)}/></Field>
@@ -6427,14 +6439,14 @@ export default function GalleryApp() {
             <>
               <div style={S.registerOverlay} onClick={()=>setRegisterMenuOpen(false)}/>
               <div style={S.registerMenu}>
-                <button style={S.registerMenuItem} onClick={()=>{setView("add_artwork");setRegisterMenuOpen(false);}}>
+                <button style={S.registerMenuItem} onClick={()=>{navigateTo("add_artwork");setRegisterMenuOpen(false);}}>
                   <span style={S.registerMenuIcon}>◈</span>
                   <div>
                     <div style={S.registerMenuTitle}>仕入を登録</div>
                     <div style={S.registerMenuSub}>新しい作品を仕入れる</div>
                   </div>
                 </button>
-                <button style={S.registerMenuItem} onClick={()=>{setView("add_sale");setRegisterMenuOpen(false);}}>
+                <button style={S.registerMenuItem} onClick={()=>{navigateTo("add_sale");setRegisterMenuOpen(false);}}>
                   <span style={S.registerMenuIcon}>◆</span>
                   <div>
                     <div style={S.registerMenuTitle}>売上を登録</div>
@@ -8629,8 +8641,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const excl       = price - tax;
       const inv        = hasInvoice(h.counterparty_id, date);
       const creditRate = getPurchaseCreditRate(date, inv, taxSettings);
-      // historyにtax_creditが保存されていれば優先使用
-      const taxCredit  = h.tax_credit != null ? h.tax_credit : rnd(tax * creditRate);
+      const taxCredit  = rnd(tax * creditRate);
       return { h, artwork, price, excl, tax, taxCredit, inv, creditRate, isDiscount: false };
     });
 
@@ -9197,12 +9208,13 @@ function TxRow({ label, val, color, large }) {
 }
 
 // ─── フォームヘルパー ───────────────────────────────────────────
-function Field({ label, required, fullWidth, children }) {
+function Field({ label, required, fullWidth, badge, children }) {
   return (
     <div style={{ ...S.formGrid, display:"flex", flexDirection:"column", gap:6,
       ...(fullWidth ? { gridColumn:"1/-1" } : {}) }}>
-      <label style={S.formLabel}>
+      <label style={{...S.formLabel, display:"flex", alignItems:"center", gap:6}}>
         {label}{required && <span style={{ color:"#f87171", marginLeft:2 }}>*</span>}
+        {badge}
       </label>
       {children}
     </div>
