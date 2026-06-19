@@ -6184,15 +6184,16 @@ export default function GalleryApp() {
               </div>
               <div style={{...S.formSectionTitle,marginTop:20}}>仕入情報</div>
               <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
-                <Field label="仕入日" fullWidth>
+                <Field label="仕入日" fullWidth required>
                   <input style={{...S.formInput,WebkitAppearance:"none",appearance:"none",maxWidth:180}} type="date" value={artworkForm.purchased_at} onChange={e=>{
                     setAF("purchased_at",e.target.value);
                     const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
-                    const inv = sup?.invoice_no && e.target.value
-                      ? (e.target.value>=sup.invoice_from && (!sup.invoice_to||e.target.value<=sup.invoice_to))
+                    const checkDate = e.target.value || new Date().toISOString().slice(0,10);
+                    const inv = sup?.invoice_no
+                      ? (checkDate>=sup.invoice_from && (!sup.invoice_to||checkDate<=sup.invoice_to))
                       : false;
-                    const rate = getTaxRate(e.target.value, taxSettings.rates);
-                    const creditRate = getPurchaseCreditRate(e.target.value, inv, taxSettings);
+                    const rate = getTaxRate(checkDate, taxSettings.rates);
+                    const creditRate = getPurchaseCreditRate(checkDate, inv, taxSettings);
                     const rnd = roundFn(taxSettings.rounding||"floor");
                     const p = Number(artworkForm.purchase_price)||0;
                     const tax = rnd(p - p/(1+rate));
@@ -6200,7 +6201,7 @@ export default function GalleryApp() {
                     setArtworkForm(prev=>({...prev, purchase_tax: taxAfterCredit, tax_credit: taxAfterCredit, creditRate }));
                   }}/>
                 </Field>
-                <Field label="仕入先" fullWidth badge={
+                <Field label="仕入先" fullWidth required badge={
                   artworkForm.supplier_id && artworkForm.creditRate != null && artworkForm.creditRate < 1 ? (
                     <span style={{fontSize:11,color:"#f87171",background:"rgba(248,113,113,0.12)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"sans-serif"}}>
                       免税事業者
@@ -6213,11 +6214,12 @@ export default function GalleryApp() {
                     onChange={(name,id)=>{
                       // 仕入先変更時に控除税額を再計算
                       const sup = counterparties.find(c=>c.cp_id===id);
-                      const inv = sup?.invoice_no && artworkForm.purchased_at
-                        ? (artworkForm.purchased_at>=sup.invoice_from && (!sup.invoice_to||artworkForm.purchased_at<=sup.invoice_to))
+                      const checkDate = artworkForm.purchased_at || new Date().toISOString().slice(0,10);
+                      const inv = sup?.invoice_no
+                        ? (checkDate>=sup.invoice_from && (!sup.invoice_to||checkDate<=sup.invoice_to))
                         : false;
-                      const rate = getTaxRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), taxSettings.rates);
-                      const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
+                      const rate = getTaxRate(checkDate, taxSettings.rates);
+                      const creditRate = getPurchaseCreditRate(checkDate, inv, taxSettings);
                       const rnd = roundFn(taxSettings.rounding||"floor");
                       const p = Number(artworkForm.purchase_price)||0;
                       const tax = rnd(p - p/(1+rate));
@@ -6227,13 +6229,14 @@ export default function GalleryApp() {
                     onQuickRegister={quickRegisterCp}
                   />
                 </Field>
-                <Field label="仕入価格 (円)"><PriceInput value={artworkForm.purchase_price} onChange={v=>{
+                <Field label="仕入価格 (円)" required><PriceInput value={artworkForm.purchase_price} onChange={v=>{
                   const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
-                  const inv = sup?.invoice_no && artworkForm.purchased_at
-                    ? (artworkForm.purchased_at>=sup.invoice_from && (!sup.invoice_to||artworkForm.purchased_at<=sup.invoice_to))
+                  const checkDate = artworkForm.purchased_at || new Date().toISOString().slice(0,10);
+                  const inv = sup?.invoice_no
+                    ? (checkDate>=sup.invoice_from && (!sup.invoice_to||checkDate<=sup.invoice_to))
                     : false;
-                  const rate = getTaxRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), taxSettings.rates);
-                  const creditRate = getPurchaseCreditRate(artworkForm.purchased_at||new Date().toISOString().slice(0,10), inv, taxSettings);
+                  const rate = getTaxRate(checkDate, taxSettings.rates);
+                  const creditRate = getPurchaseCreditRate(checkDate, inv, taxSettings);
                   const rnd = roundFn(taxSettings.rounding||"floor");
                   const tax = rnd(v - v/(1+rate));
                   const taxAfterCredit = rnd(tax*creditRate);
@@ -6251,8 +6254,8 @@ export default function GalleryApp() {
                 <Field label="発表価格 (円)"><PriceInput value={artworkForm.announce_price} onChange={v=>setAF("announce_price",v)}/></Field>
                 <Field label="仕入メモ" fullWidth><input style={S.formInput} placeholder="経緯・備考など" value={artworkForm.memo} onChange={e=>setAF("memo",e.target.value)}/></Field>
               </div>
-              <button style={{...S.submitBtn,...(!artworkForm.title||!artworkForm.artist?S.submitDisabled:{})}}
-                onClick={addArtwork} disabled={!artworkForm.title||!artworkForm.artist}>登録する</button>
+              <button style={{...S.submitBtn,...((!artworkForm.title||!artworkForm.artist||!artworkForm.purchased_at||!artworkForm.purchase_price||!artworkForm.supplier)?S.submitDisabled:{})}}
+                onClick={addArtwork} disabled={!artworkForm.title||!artworkForm.artist||!artworkForm.purchased_at||!artworkForm.purchase_price||!artworkForm.supplier}>登録する</button>
             </div>
           </div>
         )}
@@ -7119,7 +7122,8 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
   const totalPrice = selectedItems.reduce((s,i) => s + (Number(i.price)||0), 0);
   const totalTax   = selectedItems.reduce((s,i) => s + (Number(i.tax)||0), 0);
   const totalExcl  = totalPrice - totalTax;
-  const canSave    = selectedItems.length > 0 && buyerName && soldDate;
+  const canSave    = selectedItems.length > 0 && buyerName && soldDate
+    && selectedItems.every(i => i.price !== "" && i.price != null && Number(i.price) > 0);
 
   const handleSave = () => {
     if (!canSave) return;
