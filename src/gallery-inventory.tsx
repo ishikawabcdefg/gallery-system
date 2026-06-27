@@ -5127,7 +5127,7 @@ export default function GalleryApp() {
     };
     const ev = { id:nextHid, artwork_id:artwork_id, event_type:"purchase", old_price:null, new_price:pp,
       counterparty:artworkForm.supplier, counterparty_id:artworkForm.supplier_id,
-      memo:artworkForm.memo||"仕入", created_at:dt,
+      memo:artworkForm.memo||"", created_at:dt,
       purchase_tax: artworkForm.purchase_tax!=="" ? Number(artworkForm.purchase_tax) : null,
       tax_credit: artworkForm.tax_credit!=="" ? Number(artworkForm.tax_credit) : null };
     setArtworks(p=>[...p,nw]); setHistory(p=>[...p,ev]);
@@ -5809,6 +5809,7 @@ export default function GalleryApp() {
               counterparties={counterparties}
               taxSettings={taxSettings}
               galleryInfo={galleryInfo}
+              isMobile={isMobile}
               onSelectArtwork={(id)=>{setSelectedId(id);setView("detail");}}
             />
           </div>
@@ -6149,7 +6150,7 @@ export default function GalleryApp() {
                     new_price: sold_price,
                     counterparty: buyer_name,
                     counterparty_id: buyer_id,
-                    memo: memo || "売上",
+                    memo: memo || "",
                     created_at: dt,
                   }]);
                 });
@@ -7053,7 +7054,6 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
   const [soldDate,      setSoldDate]      = useState(toDay());
   const [buyerName,     setBuyerName]     = useState("");
   const [buyerId,       setBuyerId]       = useState(null);
-  const [memo,          setMemo]          = useState("");
   const [selectedItems, setSelectedItems] = useState([]);
   const [artSearch,     setArtSearch]     = useState("");
   const [artTab,        setArtTab]        = useState("ALL");
@@ -7106,7 +7106,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
       setSelectedItems(p => p.filter(i => i.artwork_id !== a.artwork_id));
     } else {
       const price = a.announce_price || 0;
-      setSelectedItems(p => [...p, { artwork_id: a.artwork_id, price, tax: calcTax(price, TAX_RATE) }]);
+      setSelectedItems(p => [...p, { artwork_id: a.artwork_id, price, tax: calcTax(price, TAX_RATE), memo: "" }]);
     }
   };
 
@@ -7133,7 +7133,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
       buyer_name: buyerName,
       buyer_id:   buyerId,
       sold_date:  soldDate,
-      memo,
+      memo: i.memo || "",
     })));
   };
 
@@ -7175,10 +7175,6 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                 </div>
               )}
             </div>
-          </div>
-          <div>
-            <label style={SF.label}>メモ</label>
-            <input style={{...S.formInput,marginTop:6}} placeholder="備考など" value={memo} onChange={e=>setMemo(e.target.value)}/>
           </div>
         </div>
       </div>
@@ -7268,10 +7264,10 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
             <span style={{fontSize:13,color:"#38bdf8",fontFamily:"sans-serif"}}>{selectedItems.length}点選択中</span>
           </div>
           <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",minWidth:520}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:680}}>
               <thead>
                 <tr style={{borderBottom:"2px solid #2a2a40"}}>
-                  {["作品ID","作家","タイトル","売上価格","消費税額","税抜額",""].map(h=>(
+                  {["作品ID","作家","タイトル","売上価格","消費税額","税抜額","メモ",""].map(h=>(
                     <th key={h} style={{padding:"8px 10px",textAlign:h==="売上価格"||h==="消費税額"||h==="税抜額"?"right":"left",fontSize:12,color:"#aaa",whiteSpace:"nowrap",fontWeight:600}}>{h}</th>
                   ))}
                 </tr>
@@ -7296,6 +7292,11 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                           onChange={e=>updateItem(item.artwork_id,"tax",e.target.value)}/>
                       </td>
                       <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#aaa"}}>{fmt(excl)}</td>
+                      <td style={{padding:"10px 10px"}}>
+                        <input style={{...S.formInput,padding:"5px 8px",fontSize:13,width:140}}
+                          placeholder="備考など" value={item.memo||""}
+                          onChange={e=>updateItem(item.artwork_id,"memo",e.target.value)}/>
+                      </td>
                       <td style={{padding:"10px 10px",textAlign:"center"}}>
                         <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:16}}
                           onClick={()=>setSelectedItems(p=>p.filter(i=>i.artwork_id!==item.artwork_id))}>✕</button>
@@ -7310,6 +7311,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                   <td style={{padding:"10px 10px",textAlign:"right",fontSize:16,color:"#4ade80",fontWeight:700}}>{fmt(totalPrice)}</td>
                   <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#f59e0b"}}>{fmt(totalTax)}</td>
                   <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#aaa"}}>{fmt(totalExcl)}</td>
+                  <td></td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -8593,7 +8595,7 @@ const IS = {
 
 
 // ─── 日計表コンポーネント ─────────────────────────────────
-function DailyReport({ artworks, history, counterparties, taxSettings, galleryInfo, onSelectArtwork }) {
+function DailyReport({ artworks, history, counterparties, taxSettings, galleryInfo, isMobile, onSelectArtwork }) {
   const fmt  = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "—";
   const [expandedDate, setExpandedDate] = useState(null);
 
@@ -8610,6 +8612,39 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
     if (cp.invoice_to   && date > cp.invoice_to)   return false;
     return true;
   };
+
+  // PC：作家・タイトル・サイズを1セルにまとめて表示
+  const ArtworkCell = ({ artwork }) => (
+    <td style={DR.tdArtwork}>
+      <div style={DR.tdArtworkArtist}>{artwork?.artist || "—"}</div>
+      <div style={DR.tdArtworkTitle}>{artwork?.title || "—"}</div>
+      {artwork?.size && <div style={DR.tdArtworkSize}>{artwork.size}</div>}
+    </td>
+  );
+
+  // スマホ：1取引=1カード
+  const MobileTxnCard = ({ artwork, cpLabel, cpName, badge, bg, amounts, onClick }) => (
+    <div style={{...DR.card, background: bg || "#0a0a14"}} onClick={onClick}>
+      <div style={DR.cardTopRow}>
+        <span style={DR.cardId}>{artwork?.artwork_id || "—"}</span>
+        <div style={DR.cardCp}>
+          <div>{cpLabel ? `${cpLabel}：${cpName||"—"}` : (cpName||"—")}</div>
+          {badge}
+        </div>
+      </div>
+      <div style={DR.cardArtist}>{artwork?.artist || "—"}</div>
+      <div style={DR.cardTitle}>{artwork?.title || "—"}</div>
+      {artwork?.size && <div style={DR.cardSize}>{artwork.size}</div>}
+      <div style={DR.cardAmountRow}>
+        {amounts.map((a, i) => (
+          <div key={i} style={DR.cardAmountCell}>
+            <span style={DR.cardAmountLabel}>{a.label}</span>
+            <span style={{...DR.cardAmountVal, color: a.color || "#e2e0f0"}}>{a.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const purchaseEvents         = history.filter(h => h.event_type === "purchase");
   const purchaseDiscountEvents = history.filter(h => h.event_type === "purchase_discount");
@@ -8837,18 +8872,36 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                 {purchaseRows.length > 0 && (
                   <div style={DR.section}>
                     <div style={{...DR.sectionTitle,color:"#60a5fa"}}>仕入</div>
+                    {isMobile ? (
+                      <div style={DR.cardList}>
+                        {purchaseRows.map(({h,artwork,price,excl,taxCredit,inv,creditRate}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty}
+                            badge={inv
+                              ? <span style={DR.invoiceBadge}>✓ インボイス</span>
+                              : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` ${(creditRate*100).toFixed(0)}%`:""}</span>}
+                            amounts={[
+                              {label:"仕入額", value:fmt(price), color:"#60a5fa"},
+                              {label:"税抜金額", value:fmt(excl)},
+                              {label:"消費税額", value:fmt(taxCredit), color:"#f59e0b"},
+                            ]}
+                            onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                        ))}
+                        <div style={DR.cardFootTotal}>
+                          <span style={DR.tfootLabel}>仕入 合計</span>
+                          <span style={{...DR.tfootVal,color:"#60a5fa"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.price,0))}</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div style={{overflowX:"auto"}}>
                       <table style={DR.tbl}>
                         <thead>
                           <tr style={DR.thead}>
                             <th style={DR.thId}>作品ID</th>
                             <th style={DR.thText}>仕入先</th>
-                            <th style={DR.thText}>作家</th>
-                            <th style={DR.thText}>タイトル</th>
-                            <th style={DR.thText}>サイズ</th>
+                            <th style={DR.thArtwork}>作家・作品</th>
                             <th style={DR.thNum}>仕入額</th>
-                            <th style={DR.thNum}>本体価格</th>
-                            <th style={DR.thNum}>控除税額</th>
+                            <th style={DR.thNum}>税抜金額</th>
+                            <th style={DR.thNum}>消費税額</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -8863,9 +8916,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                                   : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` ${(creditRate*100).toFixed(0)}%`:""}</span>
                                 }
                               </td>
-                              <td style={DR.tdText}>{artwork?.artist||"—"}</td>
-                              <td style={DR.tdTitle}>{artwork?.title||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.size||"—"}</td>
+                              <ArtworkCell artwork={artwork} />
                               <td style={{...DR.tdNum,color:"#60a5fa"}}>{fmt(price)}</td>
                               <td style={DR.tdNum}>{fmt(excl)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>{fmt(taxCredit)}</td>
@@ -8874,7 +8925,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tbody>
                         <tfoot>
                           <tr style={DR.tfoot}>
-                            <td colSpan={5} style={DR.tfootLabel}>仕入 合計</td>
+                            <td colSpan={3} style={DR.tfootLabel}>仕入 合計</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#60a5fa"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.price,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal}}>{fmt(purchaseRows.reduce((s,r)=>s+r.excl,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.taxCredit,0))}</td>
@@ -8882,6 +8933,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -8889,18 +8941,35 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                 {purchaseDiscountRows.length > 0 && (
                   <div style={{...DR.section,borderLeft:"2px solid #38bdf844"}}>
                     <div style={{...DR.sectionTitle,color:"#38bdf8"}}>仕入値引き</div>
+                    {isMobile ? (
+                      <div style={DR.cardList}>
+                        {purchaseDiscountRows.map(({h,artwork,discountAmt,excl,taxCredit,inv,creditRate}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty} bg="#000a0f"
+                            badge={inv ? <span style={DR.invoiceBadge}>✓ インボイス</span>
+                              : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` (${(creditRate*100).toFixed(0)}%控除)`:""}</span>}
+                            amounts={[
+                              {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#38bdf8"},
+                              {label:"税抜金額", value:`-${fmt(excl)}`, color:"#38bdf8"},
+                              {label:"消費税額", value:`-${fmt(taxCredit)}`, color:"#f59e0b"},
+                            ]}
+                            onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                        ))}
+                        <div style={DR.cardFootTotal}>
+                          <span style={DR.tfootLabel}>値引き 合計</span>
+                          <span style={{...DR.tfootVal,color:"#38bdf8"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.discountAmt,0))}</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div style={{overflowX:"auto"}}>
                       <table style={DR.tbl}>
                         <thead>
                           <tr style={DR.thead}>
                             <th style={DR.thId}>作品ID</th>
                             <th style={DR.thText}>仕入先</th>
-                            <th style={DR.thText}>作家</th>
-                            <th style={DR.thText}>タイトル</th>
-                            <th style={DR.thText}>サイズ</th>
+                            <th style={DR.thArtwork}>作家・作品</th>
                             <th style={DR.thNum}>値引き額</th>
-                            <th style={DR.thNum}>本体換算</th>
-                            <th style={DR.thNum}>控除税額</th>
+                            <th style={DR.thNum}>税抜金額</th>
+                            <th style={DR.thNum}>消費税額</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -8913,9 +8982,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                                 {inv ? <span style={DR.invoiceBadge}>✓ インボイス</span>
                                      : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` (${(creditRate*100).toFixed(0)}%控除)`:""}</span>}
                               </td>
-                              <td style={DR.tdText}>{artwork?.artist||"—"}</td>
-                              <td style={DR.tdTitle}>{artwork?.title||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.size||"—"}</td>
+                              <ArtworkCell artwork={artwork} />
                               <td style={{...DR.tdNum,color:"#38bdf8"}}>-{fmt(discountAmt)}</td>
                               <td style={{...DR.tdNum,color:"#38bdf8"}}>-{fmt(excl)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(taxCredit)}</td>
@@ -8924,7 +8991,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tbody>
                         <tfoot>
                           <tr style={DR.tfoot}>
-                            <td colSpan={5} style={DR.tfootLabel}>値引き 合計</td>
+                            <td colSpan={3} style={DR.tfootLabel}>値引き 合計</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#38bdf8"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.discountAmt,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#38bdf8"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.excl,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.taxCredit,0))}</td>
@@ -8932,6 +8999,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -8939,18 +9007,33 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                 {purchaseIncreaseRows.length > 0 && (
                   <div style={{...DR.section,borderLeft:"2px solid #818cf844"}}>
                     <div style={{...DR.sectionTitle,color:"#818cf8"}}>仕入値上げ</div>
+                    {isMobile ? (
+                      <div style={DR.cardList}>
+                        {purchaseIncreaseRows.map(({h,artwork,increaseAmt,excl,taxCredit}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty} bg="#080818"
+                            amounts={[
+                              {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#818cf8"},
+                              {label:"税抜金額", value:`+${fmt(excl)}`, color:"#818cf8"},
+                              {label:"消費税額", value:`+${fmt(taxCredit)}`, color:"#f59e0b"},
+                            ]}
+                            onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                        ))}
+                        <div style={DR.cardFootTotal}>
+                          <span style={DR.tfootLabel}>値上げ 合計</span>
+                          <span style={{...DR.tfootVal,color:"#818cf8"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div style={{overflowX:"auto"}}>
                       <table style={DR.tbl}>
                         <thead>
                           <tr style={DR.thead}>
                             <th style={DR.thId}>作品ID</th>
                             <th style={DR.thText}>仕入先</th>
-                            <th style={DR.thText}>作家</th>
-                            <th style={DR.thText}>タイトル</th>
-                            <th style={DR.thText}>サイズ</th>
+                            <th style={DR.thArtwork}>作家・作品</th>
                             <th style={DR.thNum}>値上げ額</th>
-                            <th style={DR.thNum}>本体換算</th>
-                            <th style={DR.thNum}>控除税額</th>
+                            <th style={DR.thNum}>税抜金額</th>
+                            <th style={DR.thNum}>消費税額</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -8959,9 +9042,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                               onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
                               <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
                               <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.artist||"—"}</td>
-                              <td style={DR.tdTitle}>{artwork?.title||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.size||"—"}</td>
+                              <ArtworkCell artwork={artwork} />
                               <td style={{...DR.tdNum,color:"#818cf8"}}>+{fmt(increaseAmt)}</td>
                               <td style={{...DR.tdNum,color:"#818cf8"}}>+{fmt(excl)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>+{fmt(taxCredit)}</td>
@@ -8970,7 +9051,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tbody>
                         <tfoot>
                           <tr style={DR.tfoot}>
-                            <td colSpan={5} style={DR.tfootLabel}>値上げ 合計</td>
+                            <td colSpan={3} style={DR.tfootLabel}>値上げ 合計</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#818cf8"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#818cf8"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.excl,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.taxCredit,0))}</td>
@@ -8978,6 +9059,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -8985,17 +9067,34 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                 {soldRows.length > 0 && (
                   <div style={DR.section}>
                     <div style={{...DR.sectionTitle,color:"#4ade80"}}>売上</div>
+                    {isMobile ? (
+                      <div style={DR.cardList}>
+                        {soldRows.map(({h,artwork,price,excl,tax,costExcl,profitLoss}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty}
+                            amounts={[
+                              {label:"売上額", value:fmt(price), color:"#4ade80"},
+                              {label:"税抜金額", value:fmt(excl)},
+                              {label:"消費税額", value:fmt(tax), color:"#f59e0b"},
+                              {label:"原価", value:fmt(costExcl)},
+                              {label:"差損益", value:fmt(profitLoss), color:profitLoss>=0?"#a78bfa":"#f87171"},
+                            ]}
+                            onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                        ))}
+                        <div style={DR.cardFootTotal}>
+                          <span style={DR.tfootLabel}>売上 合計</span>
+                          <span style={{...DR.tfootVal,color:"#4ade80"}}>{fmt(soldRows.reduce((s,r)=>s+r.price,0))}</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div style={{overflowX:"auto"}}>
-                      <table style={DR.tbl}>
+                      <table style={DR.tblWide}>
                         <thead>
                           <tr style={DR.thead}>
                             <th style={DR.thId}>作品ID</th>
                             <th style={DR.thText}>売上先</th>
-                            <th style={DR.thText}>作家</th>
-                            <th style={DR.thText}>タイトル</th>
-                            <th style={DR.thText}>サイズ</th>
+                            <th style={DR.thArtwork}>作家・作品</th>
                             <th style={DR.thNum}>売上額</th>
-                            <th style={DR.thNum}>本体価格</th>
+                            <th style={DR.thNum}>税抜金額</th>
                             <th style={DR.thNum}>消費税額</th>
                             <th style={DR.thNum}>原価</th>
                             <th style={DR.thNum}>差損益</th>
@@ -9007,9 +9106,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                               onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
                               <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
                               <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.artist||"—"}</td>
-                              <td style={DR.tdTitle}>{artwork?.title||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.size||"—"}</td>
+                              <ArtworkCell artwork={artwork} />
                               <td style={{...DR.tdNum,color:"#4ade80"}}>{fmt(price)}</td>
                               <td style={DR.tdNum}>{fmt(excl)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>{fmt(tax)}</td>
@@ -9020,7 +9117,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tbody>
                         <tfoot>
                           <tr style={DR.tfoot}>
-                            <td colSpan={5} style={DR.tfootLabel}>売上 合計</td>
+                            <td colSpan={3} style={DR.tfootLabel}>売上 合計</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#4ade80"}}>{fmt(soldRows.reduce((s,r)=>s+r.price,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal}}>{fmt(soldExclTotal)}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>{fmt(soldRows.reduce((s,r)=>s+r.tax,0))}</td>
@@ -9030,6 +9127,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -9037,20 +9135,33 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                 {soldDiscountRows.length > 0 && (
                   <div style={{...DR.section,borderLeft:"2px solid #f59e0b44"}}>
                     <div style={{...DR.sectionTitle,color:"#f59e0b"}}>売上値引き</div>
+                    {isMobile ? (
+                      <div style={DR.cardList}>
+                        {soldDiscountRows.map(({h,artwork,discountAmt,excl,tax}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty} bg="#0f0a00"
+                            amounts={[
+                              {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#f59e0b"},
+                              {label:"税抜金額", value:`-${fmt(excl)}`, color:"#f59e0b"},
+                              {label:"消費税額", value:`-${fmt(tax)}`, color:"#f59e0b"},
+                            ]}
+                            onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                        ))}
+                        <div style={DR.cardFootTotal}>
+                          <span style={DR.tfootLabel}>値引き 合計</span>
+                          <span style={{...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountTotal)}</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div style={{overflowX:"auto"}}>
                       <table style={DR.tbl}>
                         <thead>
                           <tr style={DR.thead}>
                             <th style={DR.thId}>作品ID</th>
                             <th style={DR.thText}>売上先</th>
-                            <th style={DR.thText}>作家</th>
-                            <th style={DR.thText}>タイトル</th>
-                            <th style={DR.thText}>サイズ</th>
+                            <th style={DR.thArtwork}>作家・作品</th>
                             <th style={DR.thNum}>値引き額</th>
-                            <th style={DR.thNum}>本体換算</th>
-                            <th style={DR.thNum}>消費税相当</th>
-                            <th style={DR.thNum}></th>
-                            <th style={DR.thNum}></th>
+                            <th style={DR.thNum}>税抜金額</th>
+                            <th style={DR.thNum}>消費税額</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -9059,29 +9170,24 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                               onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
                               <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
                               <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.artist||"—"}</td>
-                              <td style={DR.tdTitle}>{artwork?.title||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.size||"—"}</td>
+                              <ArtworkCell artwork={artwork} />
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(discountAmt)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(excl)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(tax)}</td>
-                              <td style={DR.tdNum}></td>
-                              <td style={DR.tdNum}></td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr style={DR.tfoot}>
-                            <td colSpan={5} style={DR.tfootLabel}>値引き 合計</td>
+                            <td colSpan={3} style={DR.tfootLabel}>値引き 合計</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountTotal)}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountRows.reduce((s,r)=>s+r.excl,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountRows.reduce((s,r)=>s+r.tax,0))}</td>
-                            <td style={DR.tdNum}></td>
-                            <td style={DR.tdNum}></td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -9089,20 +9195,33 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                 {soldIncreaseRows.length > 0 && (
                   <div style={{...DR.section,borderLeft:"2px solid #34d39944"}}>
                     <div style={{...DR.sectionTitle,color:"#34d399"}}>売上値上げ</div>
+                    {isMobile ? (
+                      <div style={DR.cardList}>
+                        {soldIncreaseRows.map(({h,artwork,increaseAmt,excl,tax}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty} bg="#001a0a"
+                            amounts={[
+                              {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#34d399"},
+                              {label:"税抜金額", value:`+${fmt(excl)}`, color:"#34d399"},
+                              {label:"消費税額", value:`+${fmt(tax)}`, color:"#f59e0b"},
+                            ]}
+                            onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                        ))}
+                        <div style={DR.cardFootTotal}>
+                          <span style={DR.tfootLabel}>値上げ 合計</span>
+                          <span style={{...DR.tfootVal,color:"#34d399"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div style={{overflowX:"auto"}}>
                       <table style={DR.tbl}>
                         <thead>
                           <tr style={DR.thead}>
                             <th style={DR.thId}>作品ID</th>
                             <th style={DR.thText}>売上先</th>
-                            <th style={DR.thText}>作家</th>
-                            <th style={DR.thText}>タイトル</th>
-                            <th style={DR.thText}>サイズ</th>
+                            <th style={DR.thArtwork}>作家・作品</th>
                             <th style={DR.thNum}>値上げ額</th>
-                            <th style={DR.thNum}>本体換算</th>
-                            <th style={DR.thNum}>消費税相当</th>
-                            <th style={DR.thNum}></th>
-                            <th style={DR.thNum}></th>
+                            <th style={DR.thNum}>税抜金額</th>
+                            <th style={DR.thNum}>消費税額</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -9111,29 +9230,24 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                               onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
                               <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
                               <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.artist||"—"}</td>
-                              <td style={DR.tdTitle}>{artwork?.title||"—"}</td>
-                              <td style={DR.tdText}>{artwork?.size||"—"}</td>
+                              <ArtworkCell artwork={artwork} />
                               <td style={{...DR.tdNum,color:"#34d399"}}>+{fmt(increaseAmt)}</td>
                               <td style={{...DR.tdNum,color:"#34d399"}}>+{fmt(excl)}</td>
                               <td style={{...DR.tdNum,color:"#f59e0b"}}>+{fmt(tax)}</td>
-                              <td style={DR.tdNum}></td>
-                              <td style={DR.tdNum}></td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr style={DR.tfoot}>
-                            <td colSpan={5} style={DR.tfootLabel}>値上げ 合計</td>
+                            <td colSpan={3} style={DR.tfootLabel}>値上げ 合計</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#34d399"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#34d399"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.excl,0))}</td>
                             <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.tax,0))}</td>
-                            <td style={DR.tdNum}></td>
-                            <td style={DR.tdNum}></td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -9163,15 +9277,21 @@ const DR = {
   detail:        { padding:"0 6px 14px", display:"flex", flexDirection:"column", gap:10 },
   section:       { background:"#0a0a14", borderRadius:8, padding:"10px 10px" },
   sectionTitle:  { fontSize:12, fontFamily:"sans-serif", letterSpacing:"0.08em", marginBottom:8, fontWeight:600 },
-  tbl:           { width:"100%", borderCollapse:"collapse", minWidth:700, fontSize:12, fontFamily:"sans-serif" },
+  tbl:           { width:"auto", borderCollapse:"collapse", minWidth:560, fontSize:12, fontFamily:"sans-serif" },
+  tblWide:       { width:"auto", borderCollapse:"collapse", minWidth:680, fontSize:12, fontFamily:"sans-serif" },
   thead:         { borderBottom:"1px solid #2a2a40" },
   thId:          { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#aaa", whiteSpace:"nowrap", width:72 },
   thText:        { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#aaa", whiteSpace:"nowrap" },
+  thArtwork:     { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#aaa", whiteSpace:"nowrap", minWidth:160 },
   thNum:         { padding:"4px 6px", textAlign:"right", fontSize:10, color:"#aaa", whiteSpace:"nowrap" },
   trow:          { borderBottom:"1px solid #13131e", cursor:"pointer", transition:"background 0.1s" },
   tdId:          { padding:"7px 6px", fontFamily:"'Courier New',monospace", fontSize:12, color:"#a78bfa", fontWeight:700, whiteSpace:"nowrap", verticalAlign:"top" },
   tdText:        { padding:"7px 6px", fontSize:12, color:"#ccc", whiteSpace:"nowrap", verticalAlign:"top", maxWidth:120, overflow:"hidden", textOverflow:"ellipsis" },
   tdTitle:       { padding:"7px 6px", fontSize:12, color:"#e2e0f0", fontWeight:600, whiteSpace:"nowrap", verticalAlign:"top", maxWidth:140, overflow:"hidden", textOverflow:"ellipsis" },
+  tdArtwork:     { padding:"7px 6px", fontSize:12, verticalAlign:"top", maxWidth:260 },
+  tdArtworkArtist:{ color:"#999", fontSize:11, marginBottom:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
+  tdArtworkTitle: { color:"#e2e0f0", fontWeight:600, fontSize:12, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
+  tdArtworkSize:  { color:"#777", fontSize:10.5, marginTop:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
   tdNum:         { padding:"7px 6px", textAlign:"right", fontFamily:"sans-serif", fontSize:13, whiteSpace:"nowrap", verticalAlign:"top" },
   tfoot:         { borderTop:"2px solid #2a2a40", background:"#0f0f18" },
   tfootLabel:    { padding:"6px 6px", fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
@@ -9184,6 +9304,21 @@ const DR = {
   fiscalVal:     { fontSize:16, fontFamily:"sans-serif", fontWeight:700 },
   invoiceBadge:  { fontSize:9, background:"#4ade8022", color:"#4ade80", border:"1px solid #4ade8044", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
   noInvoiceBadge:{ fontSize:9, background:"#f8717122", color:"#f87171", border:"1px solid #f8717144", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
+
+  // ── スマホ：カード型行 ──
+  cardList:      { display:"flex", flexDirection:"column", gap:8 },
+  card:          { borderRadius:8, padding:"10px 12px", cursor:"pointer" },
+  cardTopRow:    { display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 },
+  cardId:        { fontFamily:"'Courier New',monospace", fontSize:12, color:"#a78bfa", fontWeight:700 },
+  cardCp:        { fontSize:11, color:"#999", textAlign:"right" },
+  cardArtist:    { fontSize:11, color:"#999", marginBottom:1 },
+  cardTitle:     { fontSize:13, color:"#e2e0f0", fontWeight:600, marginBottom:1 },
+  cardSize:      { fontSize:10.5, color:"#777", marginBottom:8 },
+  cardAmountRow: { display:"flex", flexWrap:"wrap", gap:"4px 14px", borderTop:"1px solid #1e1e3088", paddingTop:6 },
+  cardAmountCell:{ display:"flex", flexDirection:"column", gap:1, minWidth:72 },
+  cardAmountLabel:{ fontSize:9.5, color:"#888" },
+  cardAmountVal: { fontSize:13, fontFamily:"sans-serif", fontWeight:600 },
+  cardFootTotal: { display:"flex", justifyContent:"space-between", padding:"8px 12px", marginTop:2, borderRadius:8, background:"#0f0f18", border:"1px solid #2a2a40" },
 };
 
 
