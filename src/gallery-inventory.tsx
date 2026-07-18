@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 
 // ─── 定数 ────────────────────────────────────────────────
 const STATUSES = {
-  in_stock:  { label: "在庫あり", color: "#4ade80" },
+  in_stock:  { label: "在庫あり", color: "#22c55e" },
   consigned: { label: "委託中",   color: "#38bdf8" },
   sold:      { label: "売却済み", color: "#f87171" },
 };
@@ -19,21 +19,19 @@ const EVENT_LABELS = {
 };
 const EVENT_COLORS = {
   purchase:          "#60a5fa",
-  purchase_discount: "#38bdf8",
-  purchase_increase: "#818cf8",
-  consign:           "#a78bfa",
-  return:            "#94a3b8",
-  sold:              "#4ade80",
-  sold_discount:     "#f59e0b",
-  sold_increase:     "#34d399",
+  purchase_discount: "#60a5fa",
+  purchase_increase: "#60a5fa",
+  consign:           "#5A57A6",
+  return:            "#64748b",
+  sold:              "#22c55e",
+  sold_discount:     "#22c55e",
+  sold_increase:     "#22c55e",
   memo:              "#64748b",
 };
-const CP_TYPES = {
-  individual: { label: "個人",     color: "#a78bfa" },
-  corporate:  { label: "法人",     color: "#38bdf8" },
-  artist:     { label: "作家",     color: "#f59e0b" },
-  gallery:    { label: "画廊・施設", color: "#60a5fa" },
-};
+// 取引先種別バッジは全種別共通でグレーのニュートラルスタイルに統一
+const CP_TYPE_BADGE_BG     = "#EFEFEF";
+const CP_TYPE_BADGE_BORDER = "#C6C6C8";
+const CP_TYPE_BADGE_TEXT   = "#5E6367";
 
 // 全角・半角スペースを半角スペース1つに正規化（連続スペースも圧縮）
 const normalizeSpaces = (s: string) => s.replace(/[\u3000\u0020]+/g, " ");
@@ -70,6 +68,23 @@ const sanitizeKana = (s: string) =>
 const initialArtworkGroups = [
   { id: 1, name: "外国作家" },
 ];
+
+// 取引先種別初期データ
+// category: "individual"（氏名を主名称として表示） / "corporate"（会社名を主名称として表示）
+const initialCounterpartyTypes = [
+  { id: 1, name: "個人",       category: "individual" },
+  { id: 2, name: "法人",       category: "corporate" },
+  { id: 3, name: "作家",       category: "individual" },
+  { id: 4, name: "画廊・施設", category: "corporate" },
+];
+// 旧仕様（固定enum文字列）からの移行マップ
+const LEGACY_CP_TYPE_MAP: Record<string, number> = { individual: 1, corporate: 2, artist: 3, gallery: 4 };
+// 旧データ（type: "individual" 等の固定文字列）を type_id（数値）に変換する
+const migrateCpType = (cp: any) => {
+  if (cp.type_id !== undefined) return cp;
+  const { type, ...rest } = cp;
+  return { ...rest, type_id: type ? (LEGACY_CP_TYPE_MAP[type] ?? null) : null };
+};
 
 const initialArtists = [
   { id: 1,  artist_id: "0001", name: "伊藤 美咲",       name_kana: "イトウ ミサキ",       group_id: null },
@@ -237,85 +252,100 @@ const calcTax = (taxIncPrice, rate, rounding="floor") => {
   return { excl, tax };
 };
 
+// その月の末日を返す（y=年, m=月1-12）
+const daysInMonthOf = (y, m) => new Date(y, m, 0).getDate();
+
+// "YYYY-MM-DD" 形式の文字列が実在する日付かを判定する
+// （JSのDateはオーバーフローを繰り上げてしまうため、年月日を分解して直接検証する）
+const isRealDate = (str) => {
+  if (!str) return false;
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(str);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (mo < 1 || mo > 12) return false;
+  if (d < 1 || d > daysInMonthOf(y, mo)) return false;
+  return true;
+};
+
 // ─── サンプルデータ ───────────────────────────────────────
 const initialCounterparties = [
   {
-    id: 1, cp_id: "0001", invoice_no: "T1234567890123", invoice_from: "2023-10-01", invoice_to: null, type: "artist", name: "田中 誠", name_kana: "タナカ マコト",
+    id: 1, cp_id: "0001", invoice_no: "T1234567890123", invoice_from: "2023-10-01", invoice_to: null, type_id: 3, name: "田中 誠", name_kana: "タナカ マコト",
     company: null, department: null,
     email: "tanaka@example.com", phone: "090-1234-5678",
     zip: "150-0001", address: "東京都渋谷区神南1-1-1", building: "", note: "油彩専門。毎年個展開催。",
   },
   {
-    id: 2, cp_id: "0002", invoice_no: "", invoice_from: null, invoice_to: null, type: "individual", name: "田村 一郎", name_kana: "タムラ イチロウ",
+    id: 2, cp_id: "0002", invoice_no: "", invoice_from: null, invoice_to: null, type_id: 1, name: "田村 一郎", name_kana: "タムラ イチロウ",
     company: "田村商事株式会社", department: null,
     email: "tamura@example.com", phone: "03-1234-5678",
     zip: "106-0032", address: "東京都港区六本木1-2-3", building: "田村ビル4F", note: "コレクター。近代日本画を好む。",
   },
   {
-    id: 3, cp_id: "0003", invoice_no: "T9876543210987", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: null,
+    id: 3, cp_id: "0003", invoice_no: "T9876543210987", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: null,
     company: "ホテル椿山荘", department: "宴会・文化事業部",
     email: "art@tsubakiyama.example.com", phone: "03-9876-5432",
     zip: "112-8680", address: "東京都文京区関口2-10-8", building: "", note: "ロビー展示スペースあり。",
   },
   {
-    id: 4, cp_id: "0004", invoice_no: "T1111222233334", invoice_from: "2023-10-01", invoice_to: null, type: "artist", name: "山本 竜", name_kana: "ヤマモト リュウ",
+    id: 4, cp_id: "0004", invoice_no: "T1111222233334", invoice_from: "2023-10-01", invoice_to: null, type_id: 3, name: "山本 竜", name_kana: "ヤマモト リュウ",
     company: null, department: null,
     email: "yamamoto@example.com", phone: "06-1111-2222",
     zip: "530-0001", address: "大阪府大阪市北区梅田1-1-1", building: "", note: "版画・シルクスクリーン専門。",
   },
   {
-    id: 5, cp_id: "0005", invoice_no: "T5555666677778", invoice_from: "2023-10-01", invoice_to: null, type: "corporate", name: null, name_kana: null,
+    id: 5, cp_id: "0005", invoice_no: "T5555666677778", invoice_from: "2023-10-01", invoice_to: null, type_id: 2, name: null, name_kana: null,
     company: "株式会社アート・ソリューションズ", department: "コレクション部",
     email: "collection@artsol.example.com", phone: "03-5555-6666",
     zip: "100-0001", address: "東京都千代田区千代田1-1", building: "千代田ビル10F", note: "企業コレクション担当。大口取引あり。",
   },
   {
-    id: 6, cp_id: "0006", invoice_no: "T2222333344445", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: "タナカ アトリエ",
+    id: 6, cp_id: "0006", invoice_no: "T2222333344445", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "タナカ アトリエ",
     company: "田中アトリエ", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "作家直営アトリエ。直接買付。",
   },
   {
-    id: 7, cp_id: "0007", invoice_no: "T3333444455556", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: "アート オオサカ ジッコウ イインカイ",
+    id: 7, cp_id: "0007", invoice_no: "T3333444455556", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "アート オオサカ ジッコウ イインカイ",
     company: "アート大阪実行委員会", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "アート大阪出展作家より仕入れ。",
   },
   {
-    id: 8, cp_id: "0008", invoice_no: "", invoice_from: null, invoice_to: null, type: "gallery", name: null, name_kana: "ガレリア ヴィスタ",
+    id: 8, cp_id: "0008", invoice_no: "", invoice_from: null, invoice_to: null, type_id: 4, name: null, name_kana: "ガレリア ヴィスタ",
     company: "ガレリア・ヴィスタ", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "ミラノ系現代アートギャラリー。海外作家取次。",
   },
   {
-    id: 9, cp_id: "0009", invoice_no: "T4444555566667", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: "ギンザ アート コレクティブ",
+    id: 9, cp_id: "0009", invoice_no: "T4444555566667", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "ギンザ アート コレクティブ",
     company: "銀座アートコレクティブ", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "銀座エリアの作家グループ。年2回企画展開催。",
   },
   {
-    id: 10, cp_id: "0010", invoice_no: "", invoice_from: null, invoice_to: null, type: "gallery", name: null, name_kana: "スペース ムー",
+    id: 10, cp_id: "0010", invoice_no: "", invoice_from: null, invoice_to: null, type_id: 4, name: null, name_kana: "スペース ムー",
     company: "スペース・ムー", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "渋谷区の貸しギャラリー。個展作品の買取対応あり。",
   },
   {
-    id: 11, cp_id: "0011", invoice_no: "", invoice_from: null, invoice_to: null, type: "gallery", name: null, name_kana: "アートブリッジ インターナショナル",
+    id: 11, cp_id: "0011", invoice_no: "", invoice_from: null, invoice_to: null, type_id: 4, name: null, name_kana: "アートブリッジ インターナショナル",
     company: "アートブリッジ・インターナショナル", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "欧米作家の日本展開を支援するエージェント会社。",
   },
   {
-    id: 12, cp_id: "0012", invoice_no: "T6666777788889", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: "オークション ハウス セントラル",
+    id: 12, cp_id: "0012", invoice_no: "T6666777788889", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "オークション ハウス セントラル",
     company: "オークションハウス・セントラル", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "東京都内の美術品競売会社。",
   },
   {
-    id: 13, cp_id: "0013", invoice_no: "T7777888899990", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: "シンワ オークション",
+    id: 13, cp_id: "0013", invoice_no: "T7777888899990", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "シンワ オークション",
     company: "シンワオークション株式会社", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "国内大手美術品オークション会社。",
   },
   {
-    id: 14, cp_id: "0014", invoice_no: "", invoice_from: null, invoice_to: null, type: "gallery", name: null, name_kana: "アトリエ ノルド",
+    id: 14, cp_id: "0014", invoice_no: "", invoice_from: null, invoice_to: null, type_id: 4, name: null, name_kana: "アトリエ ノルド",
     company: "アトリエ・ノルド", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "北欧系作家のエージェント兼ギャラリー。",
   },
   {
-    id: 15, cp_id: "0015", invoice_no: "T8888999900001", invoice_from: "2023-10-01", invoice_to: null, type: "gallery", name: null, name_kana: "ギンザ アートギャラリー イチバンカン",
+    id: 15, cp_id: "0015", invoice_no: "T8888999900001", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "ギンザ アートギャラリー イチバンカン",
     company: "銀座アートギャラリー・壱番館", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "銀座中央通り沿いの老舗画廊。",
   }
@@ -4823,6 +4853,11 @@ const additionalHistory = [
 
 // ─── ユーティリティ ───────────────────────────────────────
 const fmt   = (n) => n != null && n !== "" ? `¥${Number(n).toLocaleString()}` : "—";
+const getLatestTx = (a) => {
+  if (a.status === "sold")      return { type:"sold",      price:a.sold_price,        date:a.sold_at,      cpName:a.buyer,     cpId:a.buyer_id,     color:"#22c55e" };
+  if (a.status === "consigned") return { type:"consigned", price:a.consignment_price, date:a.consigned_at, cpName:a.consignee, cpId:a.consignee_id, color:"#38bdf8" };
+  return                              { type:"purchase",   price:a.purchase_price,    date:a.purchased_at, cpName:a.supplier,  cpId:a.supplier_id,  color:"#5A57A6" };
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
 // 月を12進数（1-9, A-C）に変換
@@ -4845,9 +4880,12 @@ const generateArtworkId = (dateStr, artworks) => {
   return `${prefix}${seq}`;
 };
 const cpDisplayName = (cp) => cp ? (cp.name || cp.company || "—") : "—";
-const cpFullName    = (cp) => {
+// 種別ID→カテゴリ（"individual"=氏名を主名称 / "corporate"=会社名を主名称）を引く
+const cpTypeCategory = (typeId, types) => types.find(t=>t.id===typeId)?.category || "individual";
+const cpTypeLabel    = (typeId, types) => types.find(t=>t.id===typeId)?.name || "未分類";
+const cpFullName     = (cp, types) => {
   if (!cp) return "—";
-  if (cp.type === "individual" || cp.type === "artist") {
+  if (cpTypeCategory(cp.type_id, types) === "individual") {
     return cp.company ? `${cp.name}（${cp.company}）` : cp.name || "—";
   }
   return cp.department ? `${cp.company} ${cp.department}` : cp.company || "—";
@@ -4871,7 +4909,7 @@ export default function GalleryApp() {
     loadLS("gallery_history", [...initialHistory, ...additionalHistory])
   );
   const [counterparties, setCounterparties] = useState<any[]>(() =>
-    loadLS("gallery_counterparties", initialCounterparties)
+    loadLS("gallery_counterparties", initialCounterparties).map(migrateCpType)
   );
   const [view,      setView]     = useState("inventory");
   const [prevView,   setPrevView]  = useState(null);
@@ -4890,6 +4928,8 @@ export default function GalleryApp() {
   const [editingArtistId, setEditingArtistId] = useState<number|null>(null);
   const [artworkGroups, setArtworkGroups] = useState<any[]>(() => loadLS("gallery_artworkGroups", initialArtworkGroups));
   const [nextGroupId, setNextGroupId] = useState(() => loadLS("gallery_nextGroupId", 2));
+  const [counterpartyTypes, setCounterpartyTypes] = useState<any[]>(() => loadLS("gallery_counterpartyTypes", initialCounterpartyTypes));
+  const [nextCpTypeId, setNextCpTypeId] = useState(() => loadLS("gallery_nextCpTypeId", 5));
 
   // 画廊情報
   const [galleryInfo, setGalleryInfo] = useState(() => loadLS("gallery_galleryInfo", {
@@ -4922,6 +4962,34 @@ export default function GalleryApp() {
     setTimeout(() => { mainRef.current?.scrollTo(0, 0); }, 0);
   };
   const [registerMenuOpen, setRegisterMenuOpen] = useState(false);
+  // アクティブタブ判定
+  const activeNav = view==="inventory" ? "inventory"
+    : view==="list"||view==="detail" ? "list"
+    : view==="daily" ? "daily"
+    : view==="consignment"||view==="consignment_new"||view==="consignment_edit" ? "consignment"
+    : view==="cp_list"||view==="cp_detail" ? "cp_list"
+    : view==="add_sale" ? null
+    : view==="settings"||view==="tax_settings"||view==="gallery_settings"||view==="staff_settings"||view==="artist_settings"||view==="artist_list"||view==="artist_form"||view==="cp_type_settings"||view==="data_settings" ? "settings"
+    : null;
+  const navBarRef = useRef<HTMLElement>(null);
+  const navItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [navSlider, setNavSlider] = useState<{left:number,width:number,visible:boolean}>({left:0,width:0,visible:false});
+  useEffect(() => {
+    const updateSlider = () => {
+      const btn = activeNav ? navItemRefs.current[activeNav] : null;
+      const bar = navBarRef.current;
+      if (btn && bar) {
+        const barRect = bar.getBoundingClientRect();
+        const btnRect = btn.getBoundingClientRect();
+        setNavSlider({ left: btnRect.left - barRect.left, width: btnRect.width, visible: true });
+      } else {
+        setNavSlider(s => ({ ...s, visible: false }));
+      }
+    };
+    updateSlider();
+    window.addEventListener("resize", updateSlider);
+    return () => window.removeEventListener("resize", updateSlider);
+  }, [activeNav, isMobile]);
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handler);
@@ -4944,7 +5012,7 @@ export default function GalleryApp() {
     const style = document.createElement("style");
     style.textContent = `
       *, *::before, *::after { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0f; }
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #F9F9F7; }
       #root { width: 100%; height: 100%; }
       button:focus { outline: none !important; border-color: inherit !important; box-shadow: none !important; }
       button:focus-visible { outline: none !important; }
@@ -4952,9 +5020,14 @@ export default function GalleryApp() {
       input[type=number]::-webkit-inner-spin-button,
       input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       input[type=number] { -moz-appearance: textfield; }
-      input::placeholder, textarea::placeholder { color: #4a4a6a !important; opacity: 1; }
-      input::-webkit-input-placeholder, textarea::-webkit-input-placeholder { color: #4a4a6a !important; }
-      input::-moz-placeholder, textarea::-moz-placeholder { color: #4a4a6a !important; opacity: 1; }
+      input::placeholder, textarea::placeholder { color: #5E6367 !important; opacity: 1; }
+      input::-webkit-input-placeholder, textarea::-webkit-input-placeholder { color: #5E6367 !important; }
+      input::-moz-placeholder, textarea::-moz-placeholder { color: #5E6367 !important; opacity: 1; }
+      @keyframes registerCardRise {
+        from { transform: translateY(40px) scale(0.9); opacity: 0; }
+        to   { transform: translateY(0) scale(1); opacity: 1; }
+      }
+      .registerCard { animation: registerCardRise 0.25s cubic-bezier(0.2,0.8,0.3,1) both; transform-origin: bottom center; }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -4967,6 +5040,8 @@ export default function GalleryApp() {
   useEffect(() => { localStorage.setItem("gallery_taxSettings",             JSON.stringify(taxSettings)); }, [taxSettings]);
   useEffect(() => { localStorage.setItem("gallery_artists",                 JSON.stringify(artists)); }, [artists]);
   useEffect(() => { localStorage.setItem("gallery_artworkGroups",           JSON.stringify(artworkGroups)); }, [artworkGroups]);
+  useEffect(() => { localStorage.setItem("gallery_counterpartyTypes",       JSON.stringify(counterpartyTypes)); }, [counterpartyTypes]);
+  useEffect(() => { localStorage.setItem("gallery_nextCpTypeId",            JSON.stringify(nextCpTypeId)); }, [nextCpTypeId]);
   useEffect(() => { localStorage.setItem("gallery_galleryInfo",             JSON.stringify(galleryInfo)); }, [galleryInfo]);
   useEffect(() => { localStorage.setItem("gallery_staffList",               JSON.stringify(staffList)); }, [staffList]);
   useEffect(() => { localStorage.setItem("gallery_consignments",            JSON.stringify(consignments)); }, [consignments]);
@@ -4984,9 +5059,9 @@ export default function GalleryApp() {
       version: 1,
       exportedAt: new Date().toISOString(),
       artworks, history, counterparties, artists, artworkGroups,
-      consignments, staffList, taxSettings, galleryInfo,
+      counterpartyTypes, consignments, staffList, taxSettings, galleryInfo,
       nextHid, nextCpId, nextArtworkInternalId, nextArtistId,
-      nextGroupId, nextStaffId, nextConsignmentId,
+      nextGroupId, nextCpTypeId, nextStaffId, nextConsignmentId,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url  = URL.createObjectURL(blob);
@@ -5010,9 +5085,10 @@ export default function GalleryApp() {
         if (!window.confirm("現在のデータをすべて上書きします。よろしいですか？")) return;
         setArtworks(data.artworks);
         setHistory(data.history);
-        setCounterparties(data.counterparties ?? []);
+        setCounterparties((data.counterparties ?? []).map(migrateCpType));
         setArtists(data.artists ?? []);
         setArtworkGroups(data.artworkGroups ?? [{ id:1, name:"外国作家" }]);
+        setCounterpartyTypes(data.counterpartyTypes ?? initialCounterpartyTypes);
         setConsignments(data.consignments ?? []);
         setStaffList(data.staffList ?? []);
         setTaxSettings(data.taxSettings ?? DEFAULT_TAX_SETTINGS);
@@ -5022,6 +5098,7 @@ export default function GalleryApp() {
         setNextArtworkInternalId(data.nextArtworkInternalId ?? 1);
         setNextArtistId(data.nextArtistId ?? 1);
         setNextGroupId(data.nextGroupId ?? 2);
+        setNextCpTypeId(data.nextCpTypeId ?? 5);
         setNextStaffId(data.nextStaffId ?? 1);
         setNextConsignmentId(data.nextConsignmentId ?? 1);
         alert("インポートが完了しました。");
@@ -5044,7 +5121,7 @@ export default function GalleryApp() {
   const [eventForm, setEventForm] = useState(emptyEvent);
   const setEF = (k,v) => setEventForm(p=>({...p,[k]:v}));
 
-  const emptyCp = { type:"individual", name:"", name_kana:"", company:"", department:"", invoice_no:"", invoice_from:"", invoice_to:"", email:"", phone:"", zip:"", address:"", building:"", note:"" };
+  const emptyCp = { type_id:1, name:"", name_kana:"", company:"", department:"", invoice_no:"", invoice_from:"", invoice_to:"", email:"", phone:"", zip:"", address:"", building:"", note:"" };
   const [cpForm, setCpForm] = useState(emptyCp);
   const setCF = (k,v) => setCpForm(p=>({...p,[k]:v}));
   const [cpEditId, setCpEditId] = useState(null);
@@ -5073,10 +5150,10 @@ export default function GalleryApp() {
     const q = search.toLowerCase();
     const mt = !q || [a.title,a.artist,a.supplier,a.consignee,a.buyer].some(s=>(s||"").toLowerCase().includes(q));
     return matchStatus && mt;
-  }), [artworks, search, statusFilter]);
+  }).sort((a,b) => (getLatestTx(b).date||"").localeCompare(getLatestTx(a).date||"")), [artworks, search, statusFilter]);
 
   const filteredCps = useMemo(() => counterparties.filter(c => {
-    const mt = cpTypeFilter === "all" || c.type === cpTypeFilter;
+    const mt = cpTypeFilter === "all" || (cpTypeFilter === "unclassified" ? c.type_id == null : c.type_id === cpTypeFilter);
     const q  = hiraToKata(cpSearch).toLowerCase().replace(/[\s\u3000]+/g,"");
     const ms = !q || [c.name,c.name_kana,c.company,c.department,c.email,c.phone,c.address]
       .some(s=>(s||"").toLowerCase().replace(/[\s\u3000]+/g,"").includes(q));
@@ -5211,7 +5288,7 @@ export default function GalleryApp() {
   };
 
   const editCp = (cp) => {
-    setCpForm({ type:cp.type, name:cp.name||"", name_kana:cp.name_kana||"",
+    setCpForm({ type_id:cp.type_id, name:cp.name||"", name_kana:cp.name_kana||"",
       company:cp.company||"", department:cp.department||"",
       invoice_no:cp.invoice_no||"", invoice_from:cp.invoice_from||"", invoice_to:cp.invoice_to||"",
       email:cp.email||"", phone:cp.phone||"",
@@ -5232,14 +5309,14 @@ export default function GalleryApp() {
   // ── 簡易取引先登録 ──
   const quickRegisterCp = (quickForm, callback) => {
     const id = nextCpId;
-    const isPersonType = quickForm.type === "individual" || quickForm.type === "artist";
+    const isPerson = isPersonType(quickForm.type_id);
     const cp_id = String(id).padStart(4, "0");
     const newCp = {
       id, cp_id,
-      type: quickForm.type,
-      name: isPersonType ? quickForm.name : null,
+      type_id: quickForm.type_id,
+      name: isPerson ? quickForm.name : null,
       name_kana: quickForm.name_kana || "",
-      company: isPersonType ? quickForm.company || null : quickForm.company,
+      company: isPerson ? quickForm.company || null : quickForm.company,
       department: null,
       email: "", phone: "",
       zip: "", address: "", building: "",
@@ -5253,17 +5330,8 @@ export default function GalleryApp() {
   const cpLabel  = (t) => t==="purchase"||t==="purchase_discount"?"仕入先":t==="sold"||t==="sold_discount"?"売却先":t==="consign"?"委託先":t==="return"?"返却元":"取引先（任意）";
   const cpHolder = (t) => t==="purchase"||t==="purchase_discount"?"例：田中 誠アトリエ":t==="sold"||t==="sold_discount"?"例：山田 太郎 様":t==="consign"?"例：ホテル椿山荘":"";
 
-  const isPersonType = (t) => t==="individual"||t==="artist";
-
-  // アクティブタブ判定
-  const activeNav = view==="inventory" ? "inventory"
-    : view==="list"||view==="detail" ? "list"
-    : view==="daily" ? "daily"
-    : view==="consignment"||view==="consignment_new"||view==="consignment_edit" ? "consignment"
-    : view==="cp_list"||view==="cp_detail" ? "cp_list"
-    : view==="add_sale" ? null
-    : view==="settings"||view==="tax_settings"||view==="gallery_settings"||view==="staff_settings"||view==="artist_settings"||view==="artist_list"||view==="artist_form"||view==="data_settings" ? "settings"
-    : null;
+  // 種別IDから「氏名を主名称にする種別（個人系）」かどうかを判定
+  const isPersonType = (typeId) => cpTypeCategory(typeId, counterpartyTypes) === "individual";
 
   // ─── レンダリング ─────────────────────────────────────
   return (
@@ -5288,39 +5356,33 @@ export default function GalleryApp() {
               <button key={key}
                 style={{...S.navItem,...(activeNav===key?S.navActive:{}),position:"relative",overflow:"hidden"}}
                 onClick={()=>{navigateTo(key);setSelectedId(null);setSelectedCpId(null);}}
-                onMouseEnter={e=>{ if(activeNav!==key) e.currentTarget.style.background="#161622"; }}
+                onMouseEnter={e=>{ if(activeNav!==key) e.currentTarget.style.background="#efeeeb"; }}
                 onMouseLeave={e=>{ e.currentTarget.style.background=""; }}>
-                {activeNav===key && <span style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#a78bfa",borderRadius:"0 2px 2px 0"}}/>}
+                {activeNav===key && <span style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#5A57A6",borderRadius:"0 2px 2px 0"}}/>}
                 <span style={S.navIcon}><span className="material-icons" style={{fontSize:16,lineHeight:1,verticalAlign:"middle"}}>{icon}</span></span>{label}
               </button>
             ))}
             <div style={S.navDivider}/>
             <button style={{...S.navItem,...S.navAdd}} onClick={()=>navigateTo("add_artwork")}
-              onMouseEnter={e=>{ e.currentTarget.style.background="#241540"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.background="#1a1030"; }}>
+              onMouseEnter={e=>{ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; }}>
               <span style={S.navIcon}>＋</span>仕入を登録
             </button>
             <button style={{...S.navItem,...S.navAdd2}} onClick={()=>navigateTo("add_sale")}
-              onMouseEnter={e=>{ e.currentTarget.style.background="#0a2030"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.background="#0a1a20"; }}>
+              onMouseEnter={e=>{ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; }}>
               <span style={S.navIcon}>＋</span>売上を登録
             </button>
           </nav>
           <div style={S.sideStats}>
-            <div style={S.statItem}><span style={S.statNum}>{stats.total}</span><span style={S.statLab}>総作品数</span></div>
-            <div style={S.statItem}><span style={{...S.statNum,color:"#4ade80"}}>{stats.in_stock}</span><span style={S.statLab}>在庫あり</span></div>
-            <div style={S.statItem}><span style={{...S.statNum,color:"#38bdf8"}}>{stats.consigned}</span><span style={S.statLab}>委託中</span></div>
-            <div style={S.statItem}><span style={{...S.statNum,color:"#f87171"}}>{stats.sold}</span><span style={S.statLab}>売却済</span></div>
-            <div style={{borderTop:"1px solid #1e1e30",paddingTop:10,marginTop:2,display:"flex",flexDirection:"column",gap:8}}>
-              <div style={S.statItem}><span style={{...S.statNum,fontSize:13,color:"#4ade80"}}>{fmt(stats.thisMonthRevenue)}</span><span style={S.statLab}>今月の売上</span></div>
-              <div style={S.statItem}><span style={{...S.statNum,fontSize:13,color:"#34d399"}}>{fmt(stats.thisFiscalRevenue)}</span><span style={S.statLab}>今期の売上</span></div>
-            </div>
+            <div style={S.statItem}><span style={{...S.statNum,fontSize:13,color:"#22c55e"}}>{fmt(stats.thisMonthRevenue)}</span><span style={S.statLab}>今月の売上</span></div>
+            <div style={S.statItem}><span style={{...S.statNum,fontSize:13,color:"#22c55e"}}>{fmt(stats.thisFiscalRevenue)}</span><span style={S.statLab}>今期の売上</span></div>
           </div>
         </aside>
       )}
 
       {/* ── メインエリア ── */}
-      <main ref={mainRef} style={{...S.main,...(isMobile?{paddingBottom:70}:{})}}>
+      <main ref={mainRef} style={{...S.main,...(isMobile?{paddingBottom:"calc(90px + env(safe-area-inset-bottom))"}:{})}}>
 
                 {/* ══ 作品一覧 ══ */}
         {view==="list" && (
@@ -5330,67 +5392,22 @@ export default function GalleryApp() {
               <input style={S.search} placeholder="作品名・作家・取引先で検索…" value={search} onChange={e=>setSearch(e.target.value)}/>
               <div style={S.filterGroup}>
                 {[["all","すべて"],["in_stock","在庫あり"],["consigned","委託中"],["sold","売却済み"]].map(([k,l])=>(
-                  <button key={k} style={{...S.filterBtn,...(statusFilter===k?S.filterActive:{})}} onClick={()=>setStatusFilter(k)}>{l}</button>
+                  <button key={k} style={{...S.filterBtn,...(statusFilter===k?S.filterActive:{})}} onClick={()=>setStatusFilter(k)}
+                    onMouseEnter={e=>{ if(statusFilter!==k){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; } }}
+                    onMouseLeave={e=>{ if(statusFilter!==k){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; } }}>{l}</button>
                 ))}
               </div>
             </div>
-            <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",margin:"0 0 12px",textAlign:"right"}}>{filteredArtworks.length}件</div>
+            <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",margin:"0 0 12px",textAlign:"right"}}>{filteredArtworks.length}件</div>
 
-            {/* PC：テーブル表示 */}
-            {!isMobile && (
-              <div style={S.tableOuter}>
-              <div style={S.tableWrap}>
-                <table style={S.table}>
-                  <thead><tr>{["ID","作品名","作家","技法","仕入先","仕入価格","発表価格","委託先","委託価格","売却先","成約価格","状態",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {filteredArtworks.map(a=>(
-                      <tr key={a.id} style={S.tr}
-                        onClick={()=>{setSelectedId(a.artwork_id);setView("detail");}}
-                        onMouseEnter={e=>e.currentTarget.style.background="#0f0f18"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <td style={{...S.td,fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",letterSpacing:"0.05em"}}>{a.artwork_id||"—"}</td>
-                        <td style={{...S.td,fontWeight:600}}>{a.title}</td>
-                        <td style={S.td}>{a.artist}</td>
-                        <td style={{...S.td,color:"#ccc",fontSize:12}}>{a.medium||"—"}</td>
-                        <td style={{...S.td,fontSize:12}}>
-                          {a.supplier_id
-                            ? <button style={S.cpLink} onClick={e=>{e.stopPropagation();setSelectedCpId(a.supplier_id);setView("cp_detail");}}>{a.supplier}</button>
-                            : <span style={{color:"#ccc"}}>{a.supplier||"—"}</span>}
-                        </td>
-                        <td style={{...S.td,...S.price}}>{fmt(a.purchase_price)}</td>
-                        <td style={{...S.td,...S.price,color:"#a78bfa"}}>{fmt(a.announce_price)}</td>
-                        <td style={{...S.td,fontSize:12}}>
-                          {a.consignee_id
-                            ? <button style={{...S.cpLink,color:"#38bdf8"}} onClick={e=>{e.stopPropagation();setSelectedCpId(a.consignee_id);setView("cp_detail");}}>{a.consignee}</button>
-                            : <span style={{color:"#ccc"}}>{a.consignee||"—"}</span>}
-                        </td>
-                        <td style={{...S.td,...S.price,color:"#38bdf8"}}>{fmt(a.consignment_price)}</td>
-                        <td style={{...S.td,fontSize:12}}>
-                          {a.buyer_id
-                            ? <button style={{...S.cpLink,color:"#4ade80"}} onClick={e=>{e.stopPropagation();setSelectedCpId(a.buyer_id);setView("cp_detail");}}>{a.buyer}</button>
-                            : <span style={{color:"#ccc"}}>{a.buyer||"—"}</span>}
-                        </td>
-                        <td style={{...S.td,...S.price,color:"#4ade80"}}>{fmt(a.sold_price)}</td>
-                        <td style={S.td}><span style={{...S.statusBadge,background:STATUSES[a.status]?.color+"22",color:STATUSES[a.status]?.color,border:`1px solid ${STATUSES[a.status]?.color}44`}}>{STATUSES[a.status]?.label}</span></td>
-                        <td style={S.td}><span style={S.arrowBtn}>→</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filteredArtworks.length===0&&<div style={S.empty}>該当する作品がありません</div>}
-              </div>
-              </div>
-            )}
-
-            {/* スマホ：カード表示 */}
-            {isMobile && (
-              <div style={{display:"flex",flexDirection:"column",gap:1}}>
+            {/* カード表示（PC・スマホ共通） */}
+            <div style={{display:"flex",flexDirection:"column",gap:1}}>
                 {filteredArtworks.map((a,i)=>(
                   <div key={a.id}
-                    style={{...MC.card,...(i%2===0?{}:{background:"#0d0d16"})}}
+                    style={{...MC.card,...(i%2===0?{}:{background:"#F9F9F7"})}}
                     onClick={()=>{setSelectedId(a.artwork_id);setView("detail");}}
-                    onMouseEnter={e=>e.currentTarget.style.background="#1a1a28"}
-                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"#0d0d16"}>
+                    onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"#F9F9F7"}>
                     <div style={MC.left}>
                       <div style={MC.artworkId}>{a.artwork_id}</div>
                     </div>
@@ -5399,24 +5416,21 @@ export default function GalleryApp() {
                       <div style={MC.artist}>{a.artist}</div>
                       <div style={MC.chips}>
                         {a.medium&&<span style={MC.plainText}>{a.medium}</span>}
-                        {a.status==="consigned"&&a.consignee&&<><span style={MC.dot}>·</span><span style={{...MC.plainText,color:"#38bdf8"}}>{a.consignee}</span></>}
-                        {a.status==="sold"&&a.buyer&&<><span style={MC.dot}>·</span><span style={{...MC.plainText,color:"#4ade80"}}>{a.buyer}</span></>}
                       </div>
                     </div>
                     <div style={MC.right}>
                       <span style={{...MC.statusBadge,background:STATUSES[a.status]?.color+"22",color:STATUSES[a.status]?.color,border:`1px solid ${STATUSES[a.status]?.color}44`}}>
                         {STATUSES[a.status]?.label}
                       </span>
-                      <div style={{...MC.price,color:a.status==="sold"?"#4ade80":"#a78bfa"}}>
-                        {fmt(a.status==="sold"?a.sold_price:a.announce_price)}
+                      <div style={{...MC.price,fontSize:14,fontWeight:700}}>
+                        {fmt(getLatestTx(a).price)}
                       </div>
-                      <div style={MC.date}>{a.purchased_at}</div>
+                      <div style={MC.date}>{getLatestTx(a).date||"—"}</div>
                     </div>
                   </div>
                 ))}
                 {filteredArtworks.length===0&&<div style={S.empty}>該当する作品がありません</div>}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -5426,7 +5440,6 @@ export default function GalleryApp() {
             <button style={S.backBtn} onClick={()=>{setView(prevView||"list");setPrevView(null);}}>← {prevView==="consignment"?"委託に戻る":"一覧に戻る"}</button>
             <div style={{...S.detailGrid,...(isMobile?S.detailGridMobile:{})}}>
               <div style={S.detailCard}>
-                <div style={S.artThumb}><span style={S.artThumbIcon}>◈</span></div>
                 <div style={S.detailInfo}>
                   <div style={S.detailStatusRow}>
                     <span style={{...S.statusBadge,background:STATUSES[selected.status]?.color+"22",color:STATUSES[selected.status]?.color,border:`1px solid ${STATUSES[selected.status]?.color}44`}}>
@@ -5434,30 +5447,30 @@ export default function GalleryApp() {
                     </span>
                   </div>
                   <h2 style={S.detailTitle}>{selected.title}</h2>
-                  {selected.artwork_id&&<div style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",letterSpacing:"0.08em",marginBottom:4}}>{selected.artwork_id}</div>}
+                  {selected.artwork_id&&<div style={{fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919",letterSpacing:"0.08em",marginBottom:4}}>{selected.artwork_id}</div>}
                   <p style={S.detailArtist}>{selected.artist}</p>
                   <div style={S.detailMeta}>
                     {selected.medium&&<span style={S.metaTagPlain}>{selected.medium}</span>}
-                    {selected.medium&&selected.size&&<span style={{color:"#444",fontSize:12}}>·</span>}
-                    {selected.size&&<span style={{...S.metaTagPlain,color:"#bbb"}}>{selected.size}</span>}
-                    {selected.appraisal&&<span style={{...S.metaTag,color:"#f59e0b",borderColor:"#f59e0b33",background:"#f59e0b11"}}>鑑定：{selected.appraisal}</span>}
+                    {selected.medium&&selected.size&&<span style={{color:"#5E6367",fontSize:12}}>·</span>}
+                    {selected.size&&<span style={{...S.metaTagPlain,color:"#5E6367"}}>{selected.size}</span>}
+                    {selected.appraisal&&<span style={{...S.metaTag,color:"#8D2728",borderColor:"#D0D0CE",background:"#EEEEEC",borderRadius:999,padding:"3px 10px",fontSize:11}}>鑑定：{selected.appraisal}</span>}
                   </div>
                   {/* 作品情報編集 */}
                   {editingDetailField==="info" ? (
-                    <div style={{background:"#0f0f18",border:"1px solid #2a2a40",borderRadius:8,padding:14,marginBottom:12}}>
-                      <div style={{fontSize:12,color:"#a78bfa",fontFamily:"sans-serif",marginBottom:10,fontWeight:600}}>作品情報を編集</div>
+                    <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:8,padding:14,marginBottom:12}}>
+                      <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:10,fontWeight:600}}>作品情報を編集</div>
                       <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        <div><div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginBottom:3}}>作品名</div>
+                        <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>作品名</div>
                           <input style={S.formInput} value={detailEditForm.title} onChange={e=>setDetailEditForm(p=>({...p,title:e.target.value}))}/></div>
-                        <div><div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginBottom:3}}>作家名</div>
+                        <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>作家名</div>
                           <ArtistSelect value={detailEditForm.artist} artistId={detailEditForm.artist_id} artists={artists}
                             onChange={(name,id,kana)=>setDetailEditForm(p=>({...p,artist:name,artist_id:id,artist_kana:kana}))}
                             onQuickRegister={quickRegisterArtist}/></div>
-                        <div><div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginBottom:3}}>技法・素材</div>
+                        <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>技法・素材</div>
                           <input style={S.formInput} value={detailEditForm.medium} onChange={e=>setDetailEditForm(p=>({...p,medium:e.target.value}))}/></div>
-                        <div><div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginBottom:3}}>サイズ</div>
+                        <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>サイズ</div>
                           <input style={S.formInput} value={detailEditForm.size} onChange={e=>setDetailEditForm(p=>({...p,size:e.target.value}))}/></div>
-                        <div><div style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginBottom:3}}>鑑定</div>
+                        <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>鑑定</div>
                           <input style={S.formInput} value={detailEditForm.appraisal} onChange={e=>setDetailEditForm(p=>({...p,appraisal:e.target.value}))}/></div>
                       </div>
                       <div style={{display:"flex",gap:8,marginTop:12}}>
@@ -5469,9 +5482,9 @@ export default function GalleryApp() {
                       </div>
                     </div>
                   ) : (
-                    <button style={{...S.addEventBtn,fontSize:11,padding:"3px 10px",marginBottom:10,color:"#f59e0b",borderColor:"#f59e0b44"}}
+                    <button style={{...S.addEventBtn,fontSize:11,padding:"3px 10px",marginBottom:10,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
                       onClick={()=>{setDetailEditForm({title:selected.title||"",artist:selected.artist||"",artist_id:selected.artist_id||"",artist_kana:selected.artist_kana||"",medium:selected.medium||"",size:selected.size||"",appraisal:selected.appraisal||""});setEditingDetailField("info");}}>
-                      ✏ 作品情報を編集
+                      <span className="material-icons" style={{fontSize:14,verticalAlign:"middle",marginRight:4}}>{"\ue3c9"}</span> 作品情報を編集
                     </button>
                   )}
                   <TxBlock color="#60a5fa" title="仕入">{(() => {
@@ -5479,20 +5492,20 @@ export default function GalleryApp() {
                     return (<>
                       <TxRow label="仕入日"   val={selected.purchased_at} />
                       <TxRow label="仕入先" val={selected.supplier_id
-                        ? <button style={S.cpLink} onClick={()=>{setSelectedCpId(selected.supplier_id);setView("cp_detail");}}>{selected.supplier}</button>
+                        ? <button style={{...S.cpLink,color:"#5E6367"}} onClick={()=>{setSelectedCpId(selected.supplier_id);setView("cp_detail");}}>{selected.supplier}</button>
                         : selected.supplier} />
-                      <TxRow label="仕入価格" val={fmt(selected.purchase_price)} />
+                      <TxRow label="仕入価格" val={fmt(selected.purchase_price)} color="#60a5fa" />
                       {ph?.purchase_tax!=null && <TxRow label="消費税額" val={fmt(ph.purchase_tax)} />}
                       {ph?.tax_credit!=null && <TxRow label="控除税額" val={fmt(ph.tax_credit)} />}
                     </>);
                   })()}</TxBlock>
-                  <TxBlock color="#a78bfa" title="発表価格">
+                  <TxBlock color="#fb923c" title="発表価格">
                     {editingDetailField==="price" ? (
                       <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
                         <input style={{...S.formInput,width:140}} type="number"
                           value={detailEditForm.announce_price}
                           onChange={e=>setDetailEditForm(p=>({...p,announce_price:e.target.value}))}/>
-                        <span style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif"}}>円</span>
+                        <span style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>円</span>
                         <button style={{...S.submitBtn,marginTop:0,padding:"6px 14px",fontSize:12}} onClick={()=>{
                           setArtworks(p=>p.map(a=>a.artwork_id===selected.artwork_id?{...a,announce_price:Number(detailEditForm.announce_price)||0}:a));
                           setEditingDetailField(null);
@@ -5501,24 +5514,24 @@ export default function GalleryApp() {
                       </div>
                     ) : (
                       <div style={{display:"flex",alignItems:"center",gap:10}}>
-                        <TxRow label="現在の発表価格" val={fmt(selected.announce_price)} color="#a78bfa" large />
-                        <button style={{...S.addEventBtn,fontSize:11,padding:"3px 10px",color:"#f59e0b",borderColor:"#f59e0b44"}}
-                          onClick={()=>{setDetailEditForm(p=>({...p,announce_price:selected.announce_price||0}));setEditingDetailField("price");}}>✏</button>
+                        <TxRow label="現在の発表価格" val={fmt(selected.announce_price)} color="#fb923c" large />
+                        <button style={{...S.addEventBtn,fontSize:11,padding:"3px 10px",color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
+                          onClick={()=>{setDetailEditForm(p=>({...p,announce_price:selected.announce_price||0}));setEditingDetailField("price");}}><span className="material-icons" style={{fontSize:14,verticalAlign:"middle"}}>{"\ue3c9"}</span></button>
                       </div>
                     )}
                   </TxBlock>
-                  <TxBlock color="#38bdf8" title="委託">
+                  <TxBlock color="#5A57A6" title="委託">
                     <TxRow label="委託先" val={selected.consignee_id
-                      ? <button style={{...S.cpLink,color:"#38bdf8"}} onClick={()=>{setSelectedCpId(selected.consignee_id);setView("cp_detail");}}>{selected.consignee}</button>
+                      ? <button style={{...S.cpLink,color:"#5E6367"}} onClick={()=>{setSelectedCpId(selected.consignee_id);setView("cp_detail");}}>{selected.consignee}</button>
                       : selected.consignee} />
-                    <TxRow label="委託価格" val={fmt(selected.consignment_price)} color="#38bdf8" />
+                    <TxRow label="委託価格" val={fmt(selected.consignment_price)} color="#5A57A6" />
                     <TxRow label="委託日"   val={selected.consigned_at} />
                   </TxBlock>
-                  <TxBlock color="#4ade80" title="売却">
+                  <TxBlock color="#22c55e" title="売却">
                     <TxRow label="売却先" val={selected.buyer_id
-                      ? <button style={{...S.cpLink,color:"#4ade80"}} onClick={()=>{setSelectedCpId(selected.buyer_id);setView("cp_detail");}}>{selected.buyer}</button>
+                      ? <button style={{...S.cpLink,color:"#5E6367"}} onClick={()=>{setSelectedCpId(selected.buyer_id);setView("cp_detail");}}>{selected.buyer}</button>
                       : selected.buyer} />
-                    <TxRow label="成約価格" val={fmt(selected.sold_price)} color="#4ade80" large />
+                    <TxRow label="成約価格" val={fmt(selected.sold_price)} color="#22c55e" large />
                     <TxRow label="売却日"   val={selected.sold_at} />
                   </TxBlock>
                 </div>
@@ -5526,7 +5539,13 @@ export default function GalleryApp() {
               <div style={S.historyPanel}>
                 <div style={S.historyHeader}>
                   <h3 style={S.historyTitle}>取引履歴</h3>
-                  <button style={S.addEventBtn} onClick={()=>{setEventForm(emptyEvent);setView("add_history");}}>＋ 記録を追加</button>
+                  <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}} onClick={()=>{
+                    const latestType = selectedHistory[selectedHistory.length-1]?.event_type;
+                    setEventForm(latestType==="consign"
+                      ? {...emptyEvent, event_type:"sold", counterparty:selected.consignee||"", counterparty_id:selected.consignee_id||null}
+                      : emptyEvent);
+                    setView("add_history");
+                  }}>＋ 記録を追加</button>
                 </div>
                 <div style={S.timeline}>
                   {selectedHistory.map((h,i)=>(
@@ -5543,10 +5562,10 @@ export default function GalleryApp() {
                           <span style={S.timelineDate}>{h.created_at}</span>
                           <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
                             {["consign","return"].includes(h.event_type)&&(
-                              <span style={{fontSize:11,color:"#555",fontFamily:"sans-serif",fontStyle:"italic"}}>委託ページから編集</span>
+                              <span style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontStyle:"italic"}}>委託ページから編集</span>
                             )}
                             {!["consign","return"].includes(h.event_type)&&(
-                            <button style={{...S.addEventBtn,fontSize:11,padding:"2px 8px",color:"#f59e0b",borderColor:"#f59e0b44"}}
+                            <button style={{...S.addEventBtn,fontSize:11,padding:"2px 8px",color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
                               onClick={()=>{
                                 setEditingHistoryId(h.id);
                                 setEventForm({
@@ -5558,10 +5577,10 @@ export default function GalleryApp() {
                                   created_at: h.created_at || "",
                                 });
                                 setView("add_history");
-                              }}>編集</button>
+                              }}><span className="material-icons" style={{fontSize:12,verticalAlign:"middle",marginRight:2}}>{"\ue3c9"}</span>編集</button>
                             )}
                             {!["consign","return"].includes(h.event_type)&&(
-                            <button style={{...S.addEventBtn,fontSize:11,padding:"2px 8px",color:"#f87171",borderColor:"#f8717144"}}
+                            <button style={{...S.addEventBtn,fontSize:11,padding:"2px 8px",color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
                               onClick={()=>{
                                 if (!window.confirm("この記録を削除しますか？")) return;
                                 // 売上削除→在庫に戻す
@@ -5589,9 +5608,8 @@ export default function GalleryApp() {
                         </div>
                         {h.counterparty&&(
                           <div style={S.timelineCp}>
-                            <span>{h.event_type==="purchase"?"📥":h.event_type==="sold"?"📤":h.event_type==="consign"?"🏛":h.event_type==="return"?"↩️":"👤"}</span>
                             {h.counterparty_id
-                              ? <button style={S.cpLink} onClick={()=>{setSelectedCpId(h.counterparty_id);setView("cp_detail");}}>{h.counterparty}</button>
+                              ? <button style={{...S.cpLink,color:"#5E6367"}} onClick={()=>{setSelectedCpId(h.counterparty_id);setView("cp_detail");}}>{h.counterparty}</button>
                               : h.counterparty}
                           </div>
                         )}
@@ -5602,10 +5620,10 @@ export default function GalleryApp() {
                             )}
                             <span style={{...S.newPrice,color:EVENT_COLORS[h.event_type]}}>{fmt(h.new_price)}</span>
                             {(h.event_type==="purchase_discount"||h.event_type==="sold_discount")&&h.old_price!=null&&(
-                              <span style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginLeft:8}}>（値引き {fmt(h.old_price-h.new_price)}）</span>
+                              <span style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginLeft:8}}>（値引き {fmt(h.old_price-h.new_price)}）</span>
                             )}
                             {(h.event_type==="purchase_increase"||h.event_type==="sold_increase")&&h.old_price!=null&&(
-                              <span style={{fontSize:11,color:"#aaa",fontFamily:"sans-serif",marginLeft:8}}>（値上げ {fmt(h.new_price-h.old_price)}）</span>
+                              <span style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginLeft:8}}>（値上げ {fmt(h.new_price-h.old_price)}）</span>
                             )}
                           </div>
                         )}
@@ -5613,7 +5631,7 @@ export default function GalleryApp() {
                       </div>
                     </div>
                   ))}
-                  {selectedHistory.length===0&&<div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"20px 0"}}>履歴はまだありません</div>}
+                  {selectedHistory.length===0&&<div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"20px 0"}}>履歴はまだありません</div>}
                 </div>
               </div>
             </div>
@@ -5625,42 +5643,39 @@ export default function GalleryApp() {
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <div style={S.pageHeader}>
               <h1 style={S.pageTitle}>取引先</h1>
-              <button style={S.addEventBtn} onClick={()=>{setCpForm(emptyCp);setCpEditId(null);setView("cp_form");}}>＋ 取引先を登録</button>
+              <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}} onClick={()=>{setCpForm(emptyCp);setCpEditId(null);setView("cp_form");}}>＋ 取引先を登録</button>
             </div>
-            <div style={S.toolbar}>
+            <div style={{...S.toolbar,...(isMobile?{flexDirection:"column",alignItems:"stretch"}:{})}}>
               <input style={S.search} placeholder="名前・会社名・メール・住所で検索…" value={cpSearch} onChange={e=>setCpSearch(e.target.value)}/>
               <div style={S.filterGroup}>
-                {[["all","すべて"],...Object.entries(CP_TYPES).map(([k,v])=>[k,v.label])].map(([k,l])=>(
-                  <button key={k} style={{...S.filterBtn,...(cpTypeFilter===k?S.filterActive:{})}} onClick={()=>setCpTypeFilter(k)}>{l}</button>
+                {[["all","すべて"],...counterpartyTypes.map(t=>[t.id,t.name]),["unclassified","未分類"]].map(([k,l])=>(
+                  <button key={k} style={{...S.filterBtn,...(cpTypeFilter===k?S.filterActive:{})}} onClick={()=>setCpTypeFilter(k)}
+                    onMouseEnter={e=>{ if(cpTypeFilter!==k){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; } }}
+                    onMouseLeave={e=>{ if(cpTypeFilter!==k){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; } }}>{l}</button>
                 ))}
               </div>
             </div>
-            <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",margin:"0 0 12px",textAlign:"right"}}>{filteredCps.length}件</div>
+            <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",margin:"0 0 12px",textAlign:"right"}}>{filteredCps.length}件</div>
 
             {/* PC：テーブル表示 */}
             {!isMobile && (
               <div style={S.tableOuter}>
               <div style={S.tableWrap}>
-                <table style={S.table}>
-                  <thead><tr>{["ID","種別","取引先名","フリガナ","部署","メール","電話","住所",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+                <table style={{...S.table,minWidth:0}}>
+                  <thead><tr>{["番号","取引先名","種類",""].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
                   <tbody>
                     {filteredCps.map(cp=>(
                       <tr key={cp.id} style={S.tr}
                         onClick={()=>{setSelectedCpId(cp.cp_id);setView("cp_detail");}}
-                        onMouseEnter={e=>e.currentTarget.style.background="#0f0f18"}
+                        onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <td style={{...S.td,fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa"}}>{cp.cp_id||"—"}</td>
+                        <td style={{...S.td,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919"}}>{cp.cp_id||"—"}</td>
+                        <td style={{...S.td,fontWeight:600,color:"#1a1919"}}>{cpDisplayName(cp)}</td>
                         <td style={S.td}>
-                          <span style={{...S.cpTypeBadge,background:CP_TYPES[cp.type]?.color+"22",color:CP_TYPES[cp.type]?.color,border:`1px solid ${CP_TYPES[cp.type]?.color}44`}}>
-                            {CP_TYPES[cp.type]?.label}
+                          <span style={{...S.cpTypeBadge,background:CP_TYPE_BADGE_BG,color:CP_TYPE_BADGE_TEXT,border:`1px solid ${CP_TYPE_BADGE_BORDER}`}}>
+                            {cpTypeLabel(cp.type_id, counterpartyTypes)}
                           </span>
                         </td>
-                        <td style={{...S.td,fontWeight:600}}>{cpDisplayName(cp)}</td>
-                        <td style={{...S.td,fontSize:12,color:"#ccc"}}>{cp.name_kana||"—"}</td>
-                        <td style={{...S.td,fontSize:12,color:"#ccc"}}>{cp.department||"—"}</td>
-                        <td style={{...S.td,fontSize:12}}>{cp.email||"—"}</td>
-                        <td style={{...S.td,fontSize:12}}>{cp.phone||"—"}</td>
-                        <td style={{...S.td,fontSize:12}}>{[cp.zip,cp.address,cp.building].filter(Boolean).join(" ")||"—"}</td>
                         <td style={S.td}><span style={S.arrowBtn}>→</span></td>
                       </tr>
                     ))}
@@ -5676,22 +5691,19 @@ export default function GalleryApp() {
               <div style={{display:"flex",flexDirection:"column",gap:1}}>
                 {filteredCps.map((cp,i)=>(
                   <div key={cp.id}
-                    style={{...MC.card,...(i%2===0?{}:{background:"#0d0d16"})}}
+                    style={{...MC.card,...(i%2===0?{}:{background:"#F9F9F7"})}}
                     onClick={()=>{setSelectedCpId(cp.cp_id);setView("cp_detail");}}
-                    onMouseEnter={e=>e.currentTarget.style.background="#1a1a28"}
-                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"#0d0d16"}>
+                    onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"#F9F9F7"}>
                     <div style={MC.left}>
                       <div style={MC.artworkId}>{cp.cp_id}</div>
                     </div>
                     <div style={{...MC.main,overflow:"visible"}}>
                       <div style={{...MC.title,whiteSpace:"normal",overflow:"visible",textOverflow:"clip"}}>{cpDisplayName(cp)}</div>
-                      {cp.name_kana&&<div style={MC.artist}>{cp.name_kana}</div>}
-                      {(isPersonType(cp.type)&&cp.company)&&<div style={{...MC.artist,color:"#bbb"}}>{cp.company}</div>}
                       <div style={MC.chips}>
-                        <span style={{...MC.chip,color:CP_TYPES[cp.type]?.color,borderColor:CP_TYPES[cp.type]?.color+"44"}}>
-                          {CP_TYPES[cp.type]?.label}
+                        <span style={{...MC.chip,background:CP_TYPE_BADGE_BG,color:CP_TYPE_BADGE_TEXT,borderColor:CP_TYPE_BADGE_BORDER}}>
+                          {cpTypeLabel(cp.type_id, counterpartyTypes)}
                         </span>
-                        {cp.department&&<span style={MC.chip}>{cp.department}</span>}
                       </div>
                     </div>
                   </div>
@@ -5711,14 +5723,14 @@ export default function GalleryApp() {
 
                 <div style={S.detailInfo}>
                   <div style={{marginBottom:10}}>
-                    <span style={{...S.cpTypeBadge,background:CP_TYPES[selectedCp.type]?.color+"22",color:CP_TYPES[selectedCp.type]?.color,border:`1px solid ${CP_TYPES[selectedCp.type]?.color}44`}}>
-                      {CP_TYPES[selectedCp.type]?.label}
+                    <span style={{...S.cpTypeBadge,background:CP_TYPE_BADGE_BG,color:CP_TYPE_BADGE_TEXT,border:`1px solid ${CP_TYPE_BADGE_BORDER}`}}>
+                      {cpTypeLabel(selectedCp.type_id, counterpartyTypes)}
                     </span>
                   </div>
                   <h2 style={S.detailTitle}>{cpDisplayName(selectedCp)}</h2>
-                  {selectedCp.cp_id&&<div style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",letterSpacing:"0.08em",marginBottom:4}}>{selectedCp.cp_id}</div>}
-                  {selectedCp.name_kana&&<p style={{...S.detailArtist,fontSize:12,color:"#bbb"}}>{selectedCp.name_kana}</p>}
-                  {selectedCp.company&&isPersonType(selectedCp.type)&&<p style={S.detailArtist}>{selectedCp.company}</p>}
+                  {selectedCp.cp_id&&<div style={{fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919",letterSpacing:"0.08em",marginBottom:4}}>{selectedCp.cp_id}</div>}
+                  {selectedCp.name_kana&&<p style={{...S.detailArtist,fontSize:12,color:"#5E6367"}}>{selectedCp.name_kana}</p>}
+                  {selectedCp.company&&isPersonType(selectedCp.type_id)&&<p style={S.detailArtist}>{selectedCp.company}</p>}
                   {selectedCp.department&&<p style={{...S.detailArtist,color:"#94a3b8"}}>{selectedCp.department}</p>}
 
                   {(selectedCp.invoice_no) && (
@@ -5729,11 +5741,11 @@ export default function GalleryApp() {
                     </TxBlock>
                   )}
                   {!selectedCp.invoice_no && (
-                    <div style={{fontSize:12,fontFamily:"sans-serif",color:"#f87171",background:"#f8717111",border:"1px solid #f8717133",borderRadius:6,padding:"6px 10px",marginBottom:8}}>
+                    <div style={{fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",color:"#f87171",background:"#f8717111",border:"1px solid #f8717133",borderRadius:6,padding:"6px 10px",marginBottom:8}}>
                       ⚠ インボイス未登録（仕入税額控除に経過措置が適用されます）
                     </div>
                   )}
-                  <TxBlock color={CP_TYPES[selectedCp.type]?.color} title="基本情報">
+                  <TxBlock color="#5A57A6" title="基本情報">
                     <TxRow label="部署"   val={selectedCp.department} />
                     <TxRow label="メール" val={selectedCp.email} />
                     <TxRow label="電話"   val={selectedCp.phone} />
@@ -5742,8 +5754,8 @@ export default function GalleryApp() {
                     <TxRow label="建物名以下" val={selectedCp.building} />
                   </TxBlock>
                   {selectedCp.note&&(
-                    <TxBlock color="#94a3b8" title="メモ">
-                      <p style={{fontSize:13,fontFamily:"sans-serif",color:"#ccc",margin:0,lineHeight:1.7}}>{selectedCp.note}</p>
+                    <TxBlock color="#64748b" title="メモ">
+                      <p style={{fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",color:"#5E6367",margin:0,lineHeight:1.7}}>{selectedCp.note}</p>
                     </TxBlock>
                   )}
                   <button style={{...S.submitBtn,marginTop:16,padding:"8px 20px",fontSize:13}}
@@ -5757,7 +5769,7 @@ export default function GalleryApp() {
               <div style={S.historyPanel}>
                 <h3 style={{...S.historyTitle,marginBottom:20}}>取引実績</h3>
                 {cpArtworks.length===0
-                  ? <div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif"}}>取引実績はまだありません</div>
+                  ? <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>取引実績はまだありません</div>
                   : [...cpArtworks].sort((a,b)=>{
                       const da = a.sold_at||a.consigned_at||a.purchased_at||"";
                       const db = b.sold_at||b.consigned_at||b.purchased_at||"";
@@ -5767,18 +5779,18 @@ export default function GalleryApp() {
                       onClick={()=>{setSelectedId(a.artwork_id);setView("detail");}}>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:600,marginBottom:2}}>{a.title}</div>
-                        <div style={{fontSize:12,color:"#ccc",fontFamily:"sans-serif"}}>{a.artist} · {a.medium}</div>
+                        <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{a.artist} · {a.medium}</div>
                         <div style={{marginTop:6,display:"flex",gap:8,flexWrap:"wrap"}}>
                           {a.supplier_id===selectedCp.cp_id&&<span style={{...S.eventTag,background:"#60a5fa22",color:"#60a5fa",border:"1px solid #60a5fa44",fontSize:12}}>仕入先</span>}
                           {a.consignee_id===selectedCp.cp_id&&<span style={{...S.eventTag,background:"#38bdf822",color:"#38bdf8",border:"1px solid #38bdf844",fontSize:12}}>委託先</span>}
-                          {a.buyer_id===selectedCp.cp_id&&<span style={{...S.eventTag,background:"#4ade8022",color:"#4ade80",border:"1px solid #4ade8044",fontSize:12}}>購入者</span>}
+                          {a.buyer_id===selectedCp.cp_id&&<span style={{...S.eventTag,background:"#22c55e22",color:"#22c55e",border:"1px solid #22c55e44",fontSize:12}}>購入者</span>}
                         </div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0}}>
                         <span style={{...S.statusBadge,background:STATUSES[a.status]?.color+"22",color:STATUSES[a.status]?.color,border:`1px solid ${STATUSES[a.status]?.color}44`}}>
                           {STATUSES[a.status]?.label}
                         </span>
-                        <div style={{...S.price,fontSize:14,marginTop:6,color:"#4ade80"}}>{a.sold_price?fmt(a.sold_price):fmt(a.announce_price)}</div>
+                        <div style={{...S.price,fontSize:14,marginTop:6,color:"#22c55e"}}>{a.sold_price?fmt(a.sold_price):fmt(a.announce_price)}</div>
                       </div>
                     </div>
                   ))
@@ -5823,19 +5835,19 @@ export default function GalleryApp() {
               {[
                 { key:"gallery_settings", label:"画廊情報",  desc:"名称・住所・連絡先",             icon:"◈" },
                 { key:"artist_settings",  label:"作家",       desc:"作家マスターの管理",             icon:"✦" },
+                { key:"cp_type_settings", label:"取引先種別", desc:"取引先の種別の管理",             icon:"▣" },
                 { key:"staff_settings",   label:"社員",       desc:"委託納品書の担当者一覧",          icon:"◎" },
                 { key:"tax_settings",     label:"消費税",     desc:"税率・インボイス経過措置の設定",  icon:"%" },
                 { key:"data_settings",    label:"データ管理", desc:"バックアップ・復元",              icon:"⬡" },
               ].map(({key,label,desc,icon})=>(
                 <button key={key}
-                  style={{display:"flex",alignItems:"center",gap:16,padding:"14px 16px",background:"#0f0f18",border:"1px solid #1e1e30",borderRadius:10,cursor:"pointer",textAlign:"left",width:"100%"}}
+                  style={{display:"flex",alignItems:"center",gap:16,padding:"14px 16px",background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:10,cursor:"pointer",textAlign:"left",width:"100%"}}
                   onClick={()=>setView(key)}>
-                  <div style={{width:36,height:36,borderRadius:8,background:"#1e1e30",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"#a78bfa",flexShrink:0}}>{icon}</div>
                   <div>
-                    <div style={{fontSize:14,color:"#e2e0f0",fontFamily:"sans-serif",fontWeight:600,marginBottom:2}}>{label}</div>
-                    <div style={{fontSize:12,color:"#ccc",fontFamily:"sans-serif"}}>{desc}</div>
+                    <div style={{fontSize:14,color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontWeight:600,marginBottom:2}}>{label}</div>
+                    <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{desc}</div>
                   </div>
-                  <span style={{marginLeft:"auto",color:"#aaa"}}>→</span>
+                  <span style={{marginLeft:"auto",color:"#5E6367"}}>→</span>
                 </button>
               ))}
             </div>
@@ -5847,7 +5859,7 @@ export default function GalleryApp() {
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>setView("settings")}>← 設定に戻る</button>
             <h1 style={S.pageTitle}>画廊情報</h1>
-            <GallerySettings galleryInfo={galleryInfo} onSave={setGalleryInfo} />
+            <GallerySettings galleryInfo={galleryInfo} onSave={setGalleryInfo} isMobile={isMobile} />
           </div>
         )}
 
@@ -5857,7 +5869,7 @@ export default function GalleryApp() {
             <button style={S.backBtn} onClick={()=>setView("settings")}>← 設定に戻る</button>
             <div style={S.pageHeader}>
               <h1 style={S.pageTitle}>作家</h1>
-              <button style={S.addEventBtn} onClick={()=>{ setEditingArtistId(null); setView("artist_form"); }}>＋ 作家を登録</button>
+              <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}} onClick={()=>{ setEditingArtistId(null); setView("artist_form"); }}>＋ 作家を登録</button>
             </div>
             <ArtistSettings
               artists={artists}
@@ -5878,7 +5890,7 @@ export default function GalleryApp() {
         {view==="artist_form" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>setView("artist_settings")}>← 作家一覧に戻る</button>
-            <h1 style={S.pageTitle}>{editingArtistId ? "作家を編集" : "作家を登録"}</h1>
+            <h1 style={{...S.pageTitle,marginBottom:24}}>{editingArtistId ? "作家を編集" : "作家を登録"}</h1>
             <ArtistForm
               artists={artists}
               artworkGroups={artworkGroups}
@@ -5887,6 +5899,23 @@ export default function GalleryApp() {
               nextId={nextArtistId}
               onNextId={setNextArtistId}
               onDone={()=>{ setEditingArtistId(null); setView("artist_settings"); }}
+              isMobile={isMobile}
+            />
+          </div>
+        )}
+
+        {/* ══ 取引先種別設定 ══ */}
+        {view==="cp_type_settings" && (
+          <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
+            <button style={S.backBtn} onClick={()=>setView("settings")}>← 設定に戻る</button>
+            <h1 style={S.pageTitle}>取引先種別</h1>
+            <CpTypeSettings
+              counterpartyTypes={counterpartyTypes}
+              counterparties={counterparties}
+              onSaveTypes={setCounterpartyTypes}
+              onSaveCounterparties={setCounterparties}
+              nextId={nextCpTypeId}
+              onNextId={setNextCpTypeId}
             />
           </div>
         )}
@@ -5922,9 +5951,9 @@ export default function GalleryApp() {
             <div style={{display:"flex",flexDirection:"column",gap:16,maxWidth:480}}>
 
               {/* エクスポート */}
-              <div style={{background:"#0f0f18",border:"1px solid #1e1e30",borderRadius:10,padding:"20px 20px"}}>
-                <div style={{fontSize:14,fontWeight:600,color:"#e2e0f0",fontFamily:"sans-serif",marginBottom:6}}>バックアップ（エクスポート）</div>
-                <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",lineHeight:1.7,marginBottom:14}}>
+              <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:10,padding:"20px 20px"}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:6}}>バックアップ（エクスポート）</div>
+                <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",lineHeight:1.7,marginBottom:14}}>
                   現在のデータをJSONファイルとして書き出します。<br/>別のPCへの移行やバックアップに使用してください。
                 </div>
                 <button style={{...S.submitBtn,marginTop:0,padding:"9px 22px",fontSize:13}}
@@ -5934,13 +5963,13 @@ export default function GalleryApp() {
               </div>
 
               {/* インポート */}
-              <div style={{background:"#0f0f18",border:"1px solid #1e1e30",borderRadius:10,padding:"20px 20px"}}>
-                <div style={{fontSize:14,fontWeight:600,color:"#e2e0f0",fontFamily:"sans-serif",marginBottom:6}}>復元（インポート）</div>
-                <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",lineHeight:1.7,marginBottom:14}}>
+              <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:10,padding:"20px 20px"}}>
+                <div style={{fontSize:14,fontWeight:600,color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:6}}>復元（インポート）</div>
+                <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",lineHeight:1.7,marginBottom:14}}>
                   バックアップしたJSONファイルを読み込みます。<br/>
                   <span style={{color:"#f87171"}}>⚠ 現在のデータはすべて上書きされます。</span>
                 </div>
-                <label style={{...S.submitBtn,marginTop:0,padding:"9px 22px",fontSize:13,cursor:"pointer",display:"inline-block",background:"#1e3a5f",color:"#60a5fa",border:"1px solid #60a5fa44"}}>
+                <label style={{...S.submitBtn,marginTop:0,padding:"9px 22px",fontSize:13,cursor:"pointer",display:"inline-block",background:"#EAF2FE",color:"#60a5fa",border:"1px solid #60a5fa44"}}>
                   ⬆ JSONを読み込む
                   <input type="file" accept=".json" style={{display:"none"}}
                     onChange={e=>{ const f=e.target.files?.[0]; if(f) importData(f); e.target.value=""; }}/>
@@ -5956,7 +5985,7 @@ export default function GalleryApp() {
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <div style={S.pageHeader}>
               <h1 style={S.pageTitle}>委託</h1>
-              <button style={S.addEventBtn} onClick={()=>setView("consignment_new")}>＋ 新規委託</button>
+              <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}} onClick={()=>setView("consignment_new")}>＋ 新規委託</button>
             </div>
             <ConsignmentList
               taxSettings={taxSettings}
@@ -6018,7 +6047,7 @@ export default function GalleryApp() {
           return (
             <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
               <button style={S.backBtn} onClick={()=>setView("consignment")}>← 委託一覧に戻る</button>
-              <h1 style={S.pageTitle}>委託を編集</h1>
+              <h1 style={{...S.pageTitle,marginBottom:24}}>委託を編集</h1>
               <ConsignmentForm
                 artworks={artworks}
                 counterparties={counterparties}
@@ -6026,6 +6055,7 @@ export default function GalleryApp() {
                 galleryInfo={galleryInfo}
                 nextId={null}
                 editTarget={target}
+                isMobile={isMobile}
                 onSave={(updated) => {
                   setConsignments(p => p.map(c => c.id === editingConsignmentId ? updated : c));
                   // 作品ステータス更新：旧itemsと新itemsを比較
@@ -6064,13 +6094,14 @@ export default function GalleryApp() {
         {view==="consignment_new" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>setView("consignment")}>← 委託一覧に戻る</button>
-            <h1 style={S.pageTitle}>新規委託</h1>
+            <h1 style={{...S.pageTitle,marginBottom:24}}>新規委託</h1>
             <ConsignmentForm
               artworks={artworks}
               counterparties={counterparties}
               staffList={staffList}
               galleryInfo={galleryInfo}
               nextId={nextConsignmentId}
+              isMobile={isMobile}
               onSave={(c) => {
                 setConsignments(p => [...p, c]);
                 setNextConsignmentId(p => p + 1);
@@ -6115,6 +6146,7 @@ export default function GalleryApp() {
               counterparties={counterparties}
               artists={artists}
               artworkGroups={artworkGroups}
+              isMobile={isMobile}
               onSelect={(artwork_id)=>{setSelectedId(artwork_id);setView("detail");}}
             />
           </div>
@@ -6124,7 +6156,7 @@ export default function GalleryApp() {
         {view==="add_sale" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>navigateTo("inventory")}>← 戻る</button>
-            <h1 style={S.pageTitle}>売上を登録</h1>
+            <h1 style={{...S.pageTitle,marginBottom:24}}>売上を登録</h1>
             <SaleForm
               key={saleFormKey}
               artworks={artworks}
@@ -6165,7 +6197,7 @@ export default function GalleryApp() {
         {view==="add_artwork" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>navigateTo("list")}>← 戻る</button>
-            <h1 style={S.pageTitle}>仕入を登録</h1>
+            <h1 style={{...S.pageTitle,marginBottom:24}}>仕入を登録</h1>
             <div style={S.formCard}>
               <div style={S.formSectionTitle}>作品情報</div>
               <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
@@ -6186,10 +6218,10 @@ export default function GalleryApp() {
               <div style={{...S.formSectionTitle,marginTop:20}}>仕入情報</div>
               <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
                 <Field label="仕入日" fullWidth required>
-                  <input style={{...S.formInput,WebkitAppearance:"none",appearance:"none",maxWidth:180}} type="date" value={artworkForm.purchased_at} onChange={e=>{
-                    setAF("purchased_at",e.target.value);
+                  <SplitDateInput value={artworkForm.purchased_at} onChange={(val)=>{
+                    setAF("purchased_at",val);
                     const sup = counterparties.find(c=>c.cp_id===artworkForm.supplier_id);
-                    const checkDate = e.target.value || new Date().toISOString().slice(0,10);
+                    const checkDate = val || new Date().toISOString().slice(0,10);
                     const inv = sup?.invoice_no
                       ? (checkDate>=sup.invoice_from && (!sup.invoice_to||checkDate<=sup.invoice_to))
                       : false;
@@ -6204,7 +6236,7 @@ export default function GalleryApp() {
                 </Field>
                 <Field label="仕入先" fullWidth required badge={
                   artworkForm.supplier_id && artworkForm.creditRate != null && artworkForm.creditRate < 1 ? (
-                    <span style={{fontSize:11,color:"#f87171",background:"rgba(248,113,113,0.12)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"sans-serif"}}>
+                    <span style={{fontSize:11,color:"#f87171",background:"rgba(248,113,113,0.12)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>
                       免税事業者
                     </span>
                   ) : undefined
@@ -6245,7 +6277,7 @@ export default function GalleryApp() {
                 }}/></Field>
                 <Field label="消費税額 (円)" badge={
                   artworkForm.creditRate != null && artworkForm.creditRate < 1 ? (
-                    <span style={{fontSize:11,color:"#38bdf8",background:"rgba(56,189,248,0.12)",border:"1px solid rgba(56,189,248,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"sans-serif"}}>
+                    <span style={{fontSize:11,color:"#38bdf8",background:"rgba(56,189,248,0.12)",border:"1px solid rgba(56,189,248,0.3)",borderRadius:4,padding:"2px 6px",whiteSpace:"nowrap",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>
                       控{Math.round((artworkForm.creditRate??1)*100)}
                     </span>
                   ) : undefined
@@ -6255,8 +6287,8 @@ export default function GalleryApp() {
                 <Field label="発表価格 (円)"><PriceInput value={artworkForm.announce_price} onChange={v=>setAF("announce_price",v)}/></Field>
                 <Field label="仕入メモ" fullWidth><input style={S.formInput} placeholder="経緯・備考など" value={artworkForm.memo} onChange={e=>setAF("memo",e.target.value)}/></Field>
               </div>
-              <button style={{...S.submitBtn,...((!artworkForm.title||!artworkForm.artist||!artworkForm.purchased_at||!artworkForm.purchase_price||!artworkForm.supplier)?S.submitDisabled:{})}}
-                onClick={addArtwork} disabled={!artworkForm.title||!artworkForm.artist||!artworkForm.purchased_at||!artworkForm.purchase_price||!artworkForm.supplier}>登録する</button>
+              <button style={{...S.submitBtn,...((!artworkForm.title||!artworkForm.artist||!isRealDate(artworkForm.purchased_at)||!artworkForm.purchase_price||!artworkForm.supplier)?S.submitDisabled:{})}}
+                onClick={addArtwork} disabled={!artworkForm.title||!artworkForm.artist||!isRealDate(artworkForm.purchased_at)||!artworkForm.purchase_price||!artworkForm.supplier}>登録する</button>
             </div>
           </div>
         )}
@@ -6265,15 +6297,17 @@ export default function GalleryApp() {
         {view==="add_history" && selected && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>{setView("detail");setEditingHistoryId(null);}}>← 戻る</button>
-            <h1 style={S.pageTitle}>{editingHistoryId?"取引記録を編集":"取引記録を追加"}</h1>
-            <p style={S.formSub}>対象：<strong style={{color:"#e2e0f0"}}>{selected.title}</strong> <span style={{color:"#ccc"}}>（{selected.artist}）</span></p>
+            <h1 style={{...S.pageTitle,marginBottom:12}}>{editingHistoryId?"取引記録を編集":"取引記録を追加"}</h1>
+            <p style={S.formSub}>対象：<strong style={{color:"#1a1919"}}>{selected.title}</strong> <span style={{color:"#5E6367"}}>（{selected.artist}）</span></p>
             <div style={S.formCard}>
-              <div style={S.formGrid}>
+              <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
                 <Field label="日付">
-                  <input style={S.formInput} type="date" value={eventForm.created_at||""} onChange={e=>setEF("created_at",e.target.value)}/>
+                  <SplitDateInput value={eventForm.created_at||""} onChange={(val)=>setEF("created_at",val)}/>
                 </Field>
                 <Field label="種別">
-                  <select style={S.formInput} value={eventForm.event_type} onChange={e=>{
+                  <select style={S.formInput} value={eventForm.event_type}
+                    disabled={editingHistoryId!=null && selectedHistory[0]?.id===editingHistoryId}
+                    onChange={e=>{
                     const t = e.target.value;
                     setEF("event_type", t);
                     // 仕入値引き：直近の仕入記録から仕入先を自動入力
@@ -6318,9 +6352,25 @@ export default function GalleryApp() {
                           counterparty_id: lastSold.counterparty_id || null
                         }));
                       }
+                    // 委託中に売上・委託戻りを選んだ場合：委託先を自動入力
+                    } else if ((t === "sold" || t === "return") && selected.status === "consigned") {
+                      setEventForm(p=>({...p, event_type:t,
+                        counterparty: selected.consignee || "",
+                        counterparty_id: selected.consignee_id || null
+                      }));
                     }
                   }}>
-                    {Object.entries(EVENT_LABELS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
+                    {(() => {
+                      const isEditingFirst = editingHistoryId!=null && selectedHistory[0]?.id===editingHistoryId;
+                      const latestType = selectedHistory[selectedHistory.length-1]?.event_type;
+                      const isAddingWhileConsigned = editingHistoryId==null && latestType === "consign";
+                      const opts = isEditingFirst
+                        ? [["purchase",EVENT_LABELS.purchase]]
+                        : isAddingWhileConsigned
+                        ? [["sold",EVENT_LABELS.sold],["return",EVENT_LABELS.return]]
+                        : Object.entries(EVENT_LABELS);
+                      return opts.map(([k,v])=><option key={k} value={k}>{v}</option>);
+                    })()}
                   </select>
                 </Field>
                 {!["memo","return"].includes(eventForm.event_type)&&(
@@ -6346,7 +6396,11 @@ export default function GalleryApp() {
                 )}
                 <Field label="メモ" fullWidth><input style={S.formInput} placeholder="詳細・経緯など" value={eventForm.memo} onChange={e=>setEF("memo",e.target.value)}/></Field>
               </div>
-              <button style={S.submitBtn} onClick={addEvent}>{editingHistoryId?"保存する":"記録する"}</button>
+              <button style={{...S.submitBtn,...((eventForm.created_at!==""&&!isRealDate(eventForm.created_at))?S.submitDisabled:{})}}
+                onClick={addEvent}
+                disabled={eventForm.created_at!==""&&!isRealDate(eventForm.created_at)}>
+                {editingHistoryId?"保存する":"記録する"}
+              </button>
             </div>
           </div>
         )}
@@ -6355,21 +6409,22 @@ export default function GalleryApp() {
         {view==="cp_form" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
             <button style={S.backBtn} onClick={()=>{setCpEditId(null);setView(cpEditId?"cp_detail":"cp_list");}}>← 戻る</button>
-            <h1 style={S.pageTitle}>{cpEditId?"取引先を編集":"取引先を登録"}</h1>
+            <h1 style={{...S.pageTitle,marginBottom:24}}>{cpEditId?"取引先を編集":"取引先を登録"}</h1>
             <div style={S.formCard}>
               <div style={S.formSectionTitle}>種別</div>
-              <div style={S.formGrid}>
+              <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
                 <Field label="種別">
-                  <select style={S.formInput} value={cpForm.type} onChange={e=>setCF("type",e.target.value)}>
-                    {Object.entries(CP_TYPES).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
+                  <select style={S.formInput} value={cpForm.type_id ?? ""} onChange={e=>setCF("type_id",e.target.value?Number(e.target.value):null)}>
+                    <option value="">未分類</option>
+                    {counterpartyTypes.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </Field>
 
               </div>
 
               <div style={{...S.formSectionTitle,marginTop:20}}>取引先情報</div>
-              <div style={S.formGrid}>
-                {isPersonType(cpForm.type) ? (
+              <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
+                {isPersonType(cpForm.type_id) ? (
                   <Field label="取引先名" required><input style={S.formInput} placeholder="例：田中 誠" value={cpForm.name}
                     onChange={e=>setCF("name",e.target.value)}
                     onBlur={e=>setCF("name",normalizeSpaces(e.target.value).trim())}/></Field>
@@ -6382,20 +6437,20 @@ export default function GalleryApp() {
                   onChange={e=>setCF("name_kana",e.target.value)}
                   onBlur={e=>setCF("name_kana",sanitizeKana(e.target.value))}/></Field>
                 <Field label="部署（任意）"><input style={S.formInput} placeholder="例：コレクション部" value={cpForm.department} onChange={e=>setCF("department",e.target.value)}/></Field>
-                {isPersonType(cpForm.type)&&(
+                {isPersonType(cpForm.type_id)&&(
                   <Field label="所属会社・団体（任意）"><input style={S.formInput} placeholder="例：田中商事株式会社" value={cpForm.company} onChange={e=>setCF("company",e.target.value)}/></Field>
                 )}
               </div>
 
               <div style={{...S.formSectionTitle,marginTop:20}}>インボイス（適格請求書）</div>
-              <div style={S.formGrid}>
+              <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
                 <Field label="インボイス登録番号（T+13桁）"><input style={S.formInput} placeholder="例：T1234567890123" value={cpForm.invoice_no} onChange={e=>setCF("invoice_no",e.target.value)}/></Field>
-                <Field label="登録開始日"><input style={S.formInput} type="date" value={cpForm.invoice_from} onChange={e=>setCF("invoice_from",e.target.value)}/></Field>
-                <Field label="登録終了日（任意）"><input style={S.formInput} type="date" value={cpForm.invoice_to} onChange={e=>setCF("invoice_to",e.target.value)}/></Field>
+                <Field label="登録開始日"><SplitDateInput value={cpForm.invoice_from} onChange={(val)=>setCF("invoice_from",val)}/></Field>
+                <Field label="登録終了日（任意）"><SplitDateInput value={cpForm.invoice_to} onChange={(val)=>setCF("invoice_to",val)}/></Field>
               </div>
 
               <div style={{...S.formSectionTitle,marginTop:20}}>連絡先</div>
-              <div style={S.formGrid}>
+              <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
                 <Field label="メールアドレス"><input style={S.formInput} type="email" placeholder="例：info@example.com" value={cpForm.email} onChange={e=>setCF("email",e.target.value)}/></Field>
                 <Field label="電話番号"><input style={S.formInput} placeholder="例：03-1234-5678" value={cpForm.phone} onChange={e=>setCF("phone",e.target.value)}/></Field>
                 <Field label="郵便番号"><input style={S.formInput} placeholder="例：150-0001" value={cpForm.zip} onChange={e=>setCF("zip",e.target.value)}/></Field>
@@ -6404,9 +6459,9 @@ export default function GalleryApp() {
                 <Field label="メモ" fullWidth><textarea style={{...S.formInput,resize:"vertical",minHeight:72}} placeholder="特記事項・嗜好など" value={cpForm.note} onChange={e=>setCF("note",e.target.value)}/></Field>
               </div>
               <button
-                style={{...S.submitBtn,...((!isPersonType(cpForm.type)&&!cpForm.company)||(isPersonType(cpForm.type)&&!cpForm.name)?S.submitDisabled:{})}}
+                style={{...S.submitBtn,...(((!isPersonType(cpForm.type_id)&&!cpForm.company)||(isPersonType(cpForm.type_id)&&!cpForm.name)||(cpForm.invoice_from&&!isRealDate(cpForm.invoice_from))||(cpForm.invoice_to&&!isRealDate(cpForm.invoice_to)))?S.submitDisabled:{})}}
                 onClick={saveCp}
-                disabled={(!isPersonType(cpForm.type)&&!cpForm.company)||(isPersonType(cpForm.type)&&!cpForm.name)}>
+                disabled={(!isPersonType(cpForm.type_id)&&!cpForm.company)||(isPersonType(cpForm.type_id)&&!cpForm.name)||(cpForm.invoice_from&&!isRealDate(cpForm.invoice_from))||(cpForm.invoice_to&&!isRealDate(cpForm.invoice_to))}>
                 {cpEditId?"保存する":"登録する"}
               </button>
             </div>
@@ -6414,43 +6469,60 @@ export default function GalleryApp() {
         )}
       </main>
 
-      {/* ══ スマホ：ボトムナビ ══ */}
+      {/* ══ スマホ：ボトムナビ（フローティング型） ══ */}
       {isMobile && (
-        <nav style={S.bottomNav}>
-          {[
-            { key:"inventory",   icon:"", label:"在庫" },
-            { key:"daily",       icon:"", label:"日計" },
-            { key:"consignment", icon:"", label:"委託" },
-            { key:"list",        icon:"", label:"作品" },
-            { key:"cp_list",     icon:"", label:"取引先" },
-            { key:"settings",    icon:"", label:"設定" },
-          ].map(({key,icon,label})=>(
-            <button key={key}
-              style={{...S.bottomNavItem,...(activeNav===key?S.bottomNavActive:{})}}
-              onClick={()=>{navigateTo(key);setSelectedId(null);setSelectedCpId(null);}}>
-              <span style={S.bottomNavIcon}><span className="material-icons" style={{fontSize:18,lineHeight:1}}>{icon}</span></span>
-              <span style={S.bottomNavLabel}>{label}</span>
-            </button>
-          ))}
+        <div style={S.bottomNavWrap}>
+          <nav style={S.bottomNavBar} ref={navBarRef}>
+            <span style={{
+              position:"absolute", top:5, bottom:5,
+              left:navSlider.left, width:navSlider.width,
+              background:"#EFEFEF", borderRadius:999,
+              opacity:navSlider.visible?1:0,
+              transition:"left 0.25s cubic-bezier(0.4,0,0.2,1), width 0.25s cubic-bezier(0.4,0,0.2,1), opacity 0.15s",
+              pointerEvents:"none" as const,
+            }}/>
+            {[
+              { key:"inventory",   icon:"", label:"在庫" },
+              { key:"daily",       icon:"", label:"日計" },
+              { key:"consignment", icon:"", label:"委託" },
+              { key:"list",        icon:"", label:"作品" },
+              { key:"cp_list",     icon:"", label:"取引先" },
+              { key:"settings",    icon:"", label:"設定" },
+            ].map(({key,icon,label})=>{
+              const active = activeNav===key;
+              return (
+                <button key={key}
+                  ref={el=>{navItemRefs.current[key]=el;}}
+                  style={S.bottomNavItem}
+                  onClick={()=>{navigateTo(key);setSelectedId(null);setSelectedCpId(null);}}>
+                  <span style={S.bottomNavHighlight}>
+                    <span className="material-icons" style={{fontSize:15,lineHeight:1,color:active?"#1a1919":"#5E6367",transition:"color 0.2s"}}>{icon}</span>
+                    <span style={{fontSize:7.5,fontWeight:700,color:active?"#1a1919":"#5E6367",transition:"color 0.2s"}}>{label}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
           <button
-            style={{...S.bottomNavItem,...S.bottomNavPlus,...(registerMenuOpen?{color:"#a78bfa"}:{})}}
+            style={S.bottomNavFab}
             onClick={()=>setRegisterMenuOpen(o=>!o)}>
-            <span style={{...S.bottomNavIcon,fontSize:22,lineHeight:1}}>{registerMenuOpen?"✕":"＋"}</span>
-            <span style={S.bottomNavLabel}>登録</span>
+            <span style={{fontSize:22,lineHeight:1}}>{registerMenuOpen?"✕":"＋"}</span>
           </button>
           {/* 登録ポップアップ */}
           {registerMenuOpen && (
             <>
               <div style={S.registerOverlay} onClick={()=>setRegisterMenuOpen(false)}/>
-              <div style={S.registerMenu}>
-                <button style={S.registerMenuItem} onClick={()=>{navigateTo("add_artwork");setRegisterMenuOpen(false);}}>
+              <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:201,display:"flex",flexDirection:"column",gap:12,padding:"0 16px 32px",boxSizing:"border-box" as const}}>
+                <button className="registerCard" style={{display:"flex",alignItems:"center",gap:12,padding:"18px 16px",cursor:"pointer",width:"100%",boxSizing:"border-box" as const,background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:12,textAlign:"left" as const}}
+                  onClick={()=>{navigateTo("add_artwork");setRegisterMenuOpen(false);}}>
                   <span style={S.registerMenuIcon}>◈</span>
                   <div>
                     <div style={S.registerMenuTitle}>仕入を登録</div>
                     <div style={S.registerMenuSub}>新しい作品を仕入れる</div>
                   </div>
                 </button>
-                <button style={S.registerMenuItem} onClick={()=>{navigateTo("add_sale");setRegisterMenuOpen(false);}}>
+                <button className="registerCard" style={{display:"flex",alignItems:"center",gap:12,padding:"18px 16px",cursor:"pointer",width:"100%",boxSizing:"border-box" as const,background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:12,textAlign:"left" as const}}
+                  onClick={()=>{navigateTo("add_sale");setRegisterMenuOpen(false);}}>
                   <span style={S.registerMenuIcon}>◆</span>
                   <div>
                     <div style={S.registerMenuTitle}>売上を登録</div>
@@ -6460,7 +6532,7 @@ export default function GalleryApp() {
               </div>
             </>
           )}
-        </nav>
+        </div>
       )}
     </div>
   );
@@ -6519,17 +6591,19 @@ function TransactionList({ history, artworks, counterparties, onSelectArtwork, o
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
           {[["all","すべて"],["purchase","仕入"],["consign","委託"],["return","委託返却"],["discount","値引き"],["sold","売却"],["memo","メモ"]].map(([k,l])=>(
             <button key={k}
-              style={{...TL.filterBtn,...(typeFilter===k?TL.filterActive:{}),...(k!=="all"?{color:EVENT_COLORS[k]||"#888",borderColor:(EVENT_COLORS[k]||"#888")+"44"}:{})}}
-              onClick={()=>setTypeFilter(k)}>{l}
+              style={{...TL.filterBtn,...(typeFilter===k?TL.filterActive:{}),...(k!=="all"?{color:EVENT_COLORS[k]||"#5E6367",borderColor:(EVENT_COLORS[k]||"#5E6367")+"44"}:{})}}
+              onClick={()=>setTypeFilter(k)}
+              onMouseEnter={e=>{ if(typeFilter!==k){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; } }}
+              onMouseLeave={e=>{ if(typeFilter!==k){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor = k!=="all" ? (EVENT_COLORS[k]||"#5E6367")+"44" : "#C6C6C8"; } }}>{l}
             </button>
           ))}
         </div>
-        <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",textAlign:"right"}}>{filtered.length}件</div>
+        <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",textAlign:"right"}}>{filtered.length}件</div>
       </div>
 
       {/* 日付グループ */}
       {sortedDates.length===0
-        ? <div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"40px 0",textAlign:"center"}}>該当する取引がありません</div>
+        ? <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"40px 0",textAlign:"center"}}>該当する取引がありません</div>
         : sortedDates.map(date => {
           const evs = groups[date];
           const { purchase, sold } = dayTotal(evs);
@@ -6539,9 +6613,9 @@ function TransactionList({ history, artworks, counterparties, onSelectArtwork, o
               <div style={TL.dateHeader}>
                 <span style={TL.dateLabel}>{fmtDate(date)}</span>
                 <div style={TL.dateSummary}>
-                  {purchase>0&&<span style={{color:"#60a5fa",fontSize:12,fontFamily:"sans-serif"}}>仕入 {fmt(purchase)}</span>}
-                  {sold>0&&<span style={{color:"#4ade80",fontSize:12,fontFamily:"sans-serif"}}>売上 {fmt(sold)}</span>}
-                  <span style={{color:"#aaa",fontSize:12,fontFamily:"sans-serif"}}>{evs.length}件</span>
+                  {purchase>0&&<span style={{color:"#60a5fa",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>仕入 {fmt(purchase)}</span>}
+                  {sold>0&&<span style={{color:"#22c55e",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>売上 {fmt(sold)}</span>}
+                  <span style={{color:"#5E6367",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{evs.length}件</span>
                 </div>
               </div>
 
@@ -6549,7 +6623,7 @@ function TransactionList({ history, artworks, counterparties, onSelectArtwork, o
               {evs.map((h,i) => {
                 const artwork = artworks.find(a => a.artwork_id === h.artwork_id);
                 return (
-                  <div key={h.id} style={{...TL.row,...(i%2===0?{}:{background:"#0d0d16"})}}>
+                  <div key={h.id} style={{...TL.row,...(i%2===0?{}:{background:"#F9F9F7"})}}>
                     {/* 種別バッジ */}
                     <div style={TL.eventType}>
                       <span style={{...TL.badge,background:EVENT_COLORS[h.event_type]+"22",color:EVENT_COLORS[h.event_type],border:`1px solid ${EVENT_COLORS[h.event_type]}44`}}>
@@ -6564,7 +6638,7 @@ function TransactionList({ history, artworks, counterparties, onSelectArtwork, o
                             <span style={TL.artworkTitle}>{artwork.title}</span>
                             <span style={TL.artworkSub}>{artwork.artist}</span>
                           </button>
-                        : <span style={{color:"#aaa",fontSize:12,fontFamily:"sans-serif"}}>—</span>
+                        : <span style={{color:"#5E6367",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>—</span>
                       }
                     </div>
 
@@ -6575,8 +6649,8 @@ function TransactionList({ history, artworks, counterparties, onSelectArtwork, o
                           ? <button style={TL.cpLink} onClick={()=>onSelectCp(h.counterparty_id)}>
                               {h.counterparty}
                             </button>
-                          : <span style={{fontSize:12,fontFamily:"sans-serif",color:"#ccc"}}>{h.counterparty}</span>
-                        : <span style={{color:"#aaa",fontSize:12}}>—</span>
+                          : <span style={{fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",color:"#5E6367"}}>{h.counterparty}</span>
+                        : <span style={{color:"#5E6367",fontSize:12}}>—</span>
                       }
                     </div>
 
@@ -6602,26 +6676,26 @@ function TransactionList({ history, artworks, counterparties, onSelectArtwork, o
 }
 
 const TL = {
-  search:      { background:"#0f0f18", border:"1px solid #2a2a40", borderRadius:8, padding:"8px 14px", color:"#e2e0f0", fontSize:13, fontFamily:"sans-serif", outline:"none", width:"100%", boxSizing:"border-box" },
-  filterBtn:   { padding:"4px 10px", borderRadius:20, border:"1px solid #2a2a40", background:"transparent", color:"#ccc", cursor:"pointer", fontSize:12, fontFamily:"sans-serif" },
-  filterActive:{ background:"#1e1e30", color:"#e2e0f0", borderColor:"#a78bfa55" },
+  search:      { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 14px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", width:"100%", boxSizing:"border-box" },
+  filterBtn:   { padding:"4px 10px", borderRadius:20, border:"1px solid #C6C6C8", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  filterActive:{ background:"#081319", color:"#fff", borderColor:"#081319" },
   dateGroup:   { marginBottom:24 },
-  dateHeader:  { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0 6px", borderBottom:"2px solid #1e1e30", marginBottom:2 },
+  dateHeader:  { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0 6px", borderBottom:"2px solid #C6C6C8", marginBottom:2 },
   dateLabel:   { fontSize:14, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em" },
   dateSummary: { display:"flex", gap:12, alignItems:"center" },
-  row:         { display:"flex", alignItems:"center", gap:12, padding:"10px 6px", borderBottom:"1px solid #13131e", flexWrap:"wrap" },
+  row:         { display:"flex", alignItems:"center", gap:12, padding:"10px 6px", borderBottom:"1px solid #C6C6C8", flexWrap:"wrap" },
   eventType:   { flexShrink:0, width:70 },
-  badge:       { padding:"2px 7px", borderRadius:12, fontSize:12, fontFamily:"sans-serif", whiteSpace:"nowrap" },
+  badge:       { padding:"2px 7px", borderRadius:12, fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap" },
   artworkCol:  { flex:1, minWidth:120 },
   artworkLink: { background:"none", border:"none", padding:0, cursor:"pointer", textAlign:"left", display:"flex", flexDirection:"column", gap:1 },
-  artworkTitle:{ fontSize:13, color:"#e2e0f0", fontWeight:600 },
-  artworkSub:  { fontSize:12, color:"#ccc", fontFamily:"sans-serif" },
+  artworkTitle:{ fontSize:13, color:"#1a1919", fontWeight:600 },
+  artworkSub:  { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   cpCol:       { flexShrink:0, minWidth:100, maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" },
-  cpLink:      { background:"none", border:"none", color:"#a78bfa", cursor:"pointer", fontSize:12, fontFamily:"sans-serif", padding:0, textDecoration:"underline", textDecorationStyle:"dotted" },
+  cpLink:      { background:"none", border:"none", color:"#5A57A6", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", padding:0, textDecoration:"none" },
   priceCol:    { flexShrink:0, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2, minWidth:90 },
-  oldPrice:    { fontSize:12, color:"#aaa", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textDecoration:"line-through" },
+  oldPrice:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textDecoration:"line-through" },
   newPrice:    { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
-  memo:        { width:"100%", fontSize:12, color:"#bbb", fontFamily:"sans-serif", paddingLeft:82 },
+  memo:        { width:"100%", fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", paddingLeft:82 },
 };
 
 
@@ -6706,29 +6780,29 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
       {/* 作家削除確認ダイアログ */}
       {confirmDeleteId !== null && (
         <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
-          <div style={{background:"#1a1a2e",border:"1px solid #2e2e48",borderRadius:12,padding:"28px 32px",maxWidth:400,width:"90%",textAlign:"center"}}>
+          <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:12,padding:"28px 32px",maxWidth:400,width:"90%",textAlign:"center"}}>
             {hasArtworks ? (
               <>
-                <div style={{fontSize:18,fontFamily:"sans-serif",marginBottom:8,color:"#f87171"}}>削除できません</div>
-                <div style={{fontSize:14,color:"#bbb",fontFamily:"sans-serif",marginBottom:24,lineHeight:1.8}}>
-                  <span style={{color:"#e2e0f0",fontWeight:"bold"}}>{targetArtist?.name}</span> の作品が<br/>
+                <div style={{fontSize:18,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:8,color:"#f87171"}}>削除できません</div>
+                <div style={{fontSize:14,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:24,lineHeight:1.8}}>
+                  <span style={{color:"#1a1919",fontWeight:"bold"}}>{targetArtist?.name}</span> の作品が<br/>
                   作品一覧に <span style={{color:"#f59e0b",fontWeight:"bold"}}>{artworkCount}点</span> 登録されています。<br/>
                   先に作品をすべて削除してから、<br/>作家を削除してください。
                 </div>
-                <button style={{padding:"8px 32px",borderRadius:6,border:"none",background:"#2a2a40",color:"#ccc",cursor:"pointer",fontSize:13,fontFamily:"sans-serif"}}
+                <button style={{padding:"8px 32px",borderRadius:6,border:"none",background:"#C6C6C8",color:"#5E6367",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                   onClick={()=>setConfirmDeleteId(null)}>閉じる</button>
               </>
             ) : (
               <>
-                <div style={{fontSize:18,fontFamily:"sans-serif",marginBottom:8}}>削除の確認</div>
-                <div style={{fontSize:14,color:"#bbb",fontFamily:"sans-serif",marginBottom:24,lineHeight:1.6}}>
-                  <span style={{color:"#e2e0f0",fontWeight:"bold"}}>{targetArtist?.name}</span>（{targetArtist?.name_kana}）を削除しますか？<br/>
+                <div style={{fontSize:18,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:8}}>削除の確認</div>
+                <div style={{fontSize:14,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:24,lineHeight:1.6}}>
+                  <span style={{color:"#1a1919",fontWeight:"bold"}}>{targetArtist?.name}</span>（{targetArtist?.name_kana}）を削除しますか？<br/>
                   この操作は取り消せません。
                 </div>
                 <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-                  <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#2a2a40",color:"#ccc",cursor:"pointer",fontSize:13,fontFamily:"sans-serif"}}
+                  <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#C6C6C8",color:"#5E6367",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                     onClick={()=>setConfirmDeleteId(null)}>キャンセル</button>
-                  <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#f87171",color:"#fff",cursor:"pointer",fontSize:13,fontFamily:"sans-serif"}}
+                  <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#f87171",color:"#fff",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                     onClick={doDelete}>削除する</button>
                 </div>
               </>
@@ -6740,19 +6814,19 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
       {/* グループ削除確認ダイアログ */}
       {confirmDeleteGroupId !== null && (
         <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
-          <div style={{background:"#1a1a2e",border:"1px solid #2e2e48",borderRadius:12,padding:"28px 32px",maxWidth:400,width:"90%",textAlign:"center"}}>
-            <div style={{fontSize:18,fontFamily:"sans-serif",marginBottom:8}}>グループを削除</div>
-            <div style={{fontSize:14,color:"#bbb",fontFamily:"sans-serif",marginBottom:24,lineHeight:1.8}}>
-              <span style={{color:"#e2e0f0",fontWeight:"bold"}}>「{targetGroup?.name}」</span> を削除します。<br/>
+          <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:12,padding:"28px 32px",maxWidth:400,width:"90%",textAlign:"center"}}>
+            <div style={{fontSize:18,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:8}}>グループを削除</div>
+            <div style={{fontSize:14,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:24,lineHeight:1.8}}>
+              <span style={{color:"#1a1919",fontWeight:"bold"}}>「{targetGroup?.name}」</span> を削除します。<br/>
               {groupArtistCount > 0 && (
                 <span>このグループに属する <span style={{color:"#f59e0b",fontWeight:"bold"}}>{groupArtistCount}名</span> の作家は未分類になります。<br/></span>
               )}
               この操作は取り消せません。
             </div>
             <div style={{display:"flex",gap:10,justifyContent:"center"}}>
-              <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#2a2a40",color:"#ccc",cursor:"pointer",fontSize:13,fontFamily:"sans-serif"}}
+              <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#C6C6C8",color:"#5E6367",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                 onClick={()=>setConfirmDeleteGroupId(null)}>キャンセル</button>
-              <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#f87171",color:"#fff",cursor:"pointer",fontSize:13,fontFamily:"sans-serif"}}
+              <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#f87171",color:"#fff",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                 onClick={doDeleteGroup}>削除する</button>
             </div>
           </div>
@@ -6760,11 +6834,13 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
       )}
 
       {/* タブ切り替え：作家一覧 / グループ管理 */}
-      <div style={{display:"flex",gap:4,marginBottom:20,borderBottom:"1px solid #1e1e30",paddingBottom:0}}>
+      <div style={{display:"flex",gap:4,marginBottom:20}}>
         {(["artists","groups"] as const).map(tab=>(
           <button key={tab}
-            style={{padding:"8px 20px",background:"none",border:"none",borderBottom:groupTab===tab?"2px solid #a78bfa":"2px solid transparent",color:groupTab===tab?"#a78bfa":"#888",cursor:"pointer",fontSize:13,fontFamily:"sans-serif",fontWeight:groupTab===tab?600:400,marginBottom:-1}}
-            onClick={e=>{setGroupTab(tab);e.currentTarget.blur();}}>
+            style={{padding:"8px 20px",borderRadius:8,background:groupTab===tab?"#081319":"#F9F9F7",border:groupTab===tab?"1px solid #081319":"1px solid #C6C6C8",color:groupTab===tab?"#fff":"#5E6367",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontWeight:groupTab===tab?600:400}}
+            onClick={e=>{setGroupTab(tab);e.currentTarget.blur();}}
+            onMouseEnter={e=>{ if(groupTab!==tab){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; } }}
+            onMouseLeave={e=>{ if(groupTab!==tab){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; } }}>
             {tab==="artists"?"作家一覧":"グループ管理"}
           </button>
         ))}
@@ -6776,28 +6852,28 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
           <div style={S.toolbar}>
             <input style={S.search} placeholder="名前・フリガナで検索…" value={search} onChange={e=>setSearch(e.target.value)}/>
           </div>
-          <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",margin:"0 0 12px",textAlign:"right"}}>{filtered.length}件</div>
+          <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",margin:"0 0 12px",textAlign:"right"}}>{filtered.length}件</div>
           <div style={{display:"flex",flexDirection:"column",gap:0}}>
             {filtered.map(a=>{
               const grp = artworkGroups.find(g=>g.id===a.group_id);
               return (
-                <div key={a.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #1e1e30"}}>
-                  <span style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",width:40,flexShrink:0}}>{a.artist_id}</span>
+                <div key={a.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #C6C6C8"}}>
+                  <span style={{fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919",width:40,flexShrink:0}}>{a.artist_id}</span>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontFamily:"sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{fontSize:14,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",display:"flex",alignItems:"center",gap:6}}>
                       {a.name}
                       {grp && <span style={{fontSize:11,color:"#818cf8",border:"1px solid #818cf8",borderRadius:3,padding:"0 4px",lineHeight:"16px"}}>{grp.name}</span>}
                     </div>
-                    <div style={{fontSize:12,color:"#bbb",fontFamily:"sans-serif"}}>{a.name_kana}</div>
+                    <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{a.name_kana}</div>
                   </div>
-                  <button style={{background:"none",border:"none",color:"#a78bfa",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+                  <button style={{background:"none",border:"none",color:"#5A57A6",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                     onClick={()=>onEdit(a.id)}>編集</button>
-                  <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+                  <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                     onClick={()=>confirmDelete(a.id)}>削除</button>
                 </div>
               );
             })}
-            {filtered.length===0&&<div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"20px 0"}}>該当する作家がいません</div>}
+            {filtered.length===0&&<div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"20px 0"}}>該当する作家がいません</div>}
           </div>
         </>
       )}
@@ -6805,7 +6881,7 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
       {/* ── グループ管理タブ ── */}
       {groupTab==="groups" && (
         <>
-          <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",marginBottom:16,lineHeight:1.6}}>
+          <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:16,lineHeight:1.6}}>
             グループを定義して作家を分類できます。在庫ページのタブとして表示されます。
           </div>
 
@@ -6819,7 +6895,7 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
               onKeyDown={e=>{if(e.key==="Enter")addGroup();}}
             />
             <button
-              style={{padding:"8px 16px",borderRadius:6,border:"none",background:newGroupName.trim()?"#a78bfa":"#2a2a40",color:newGroupName.trim()?"#fff":"#666",cursor:newGroupName.trim()?"pointer":"default",fontSize:13,fontFamily:"sans-serif",whiteSpace:"nowrap"}}
+              style={{padding:"8px 16px",borderRadius:6,border:"none",background:newGroupName.trim()?"#5A57A6":"#C6C6C8",color:newGroupName.trim()?"#fff":"#5E6367",cursor:newGroupName.trim()?"pointer":"default",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",whiteSpace:"nowrap"}}
               onClick={addGroup} disabled={!newGroupName.trim()}>
               ＋ 追加
             </button>
@@ -6827,19 +6903,19 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
 
           {/* グループ一覧 */}
           {artworkGroups.length===0 ? (
-            <div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"20px 0",textAlign:"center"}}>グループがまだありません</div>
+            <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"20px 0",textAlign:"center"}}>グループがまだありません</div>
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:0}}>
               {artworkGroups.map((g,idx)=>{
                 const cnt = artists.filter(a=>a.group_id===g.id).length;
                 const isEditing = editingGroupId===g.id;
                 return (
-                  <div key={g.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:"1px solid #1e1e30"}}>
+                  <div key={g.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:"1px solid #C6C6C8"}}>
                     {/* 並び替えボタン */}
                     <div style={{display:"flex",flexDirection:"column",gap:1,flexShrink:0}}>
-                      <button style={{background:"none",border:"none",color:idx===0?"#333":"#888",cursor:idx===0?"default":"pointer",fontSize:10,padding:"1px 4px",lineHeight:1}}
+                      <button style={{background:"none",border:"none",color:idx===0?"#5E6367":"#5E6367",cursor:idx===0?"default":"pointer",fontSize:10,padding:"1px 4px",lineHeight:1}}
                         onClick={()=>moveGroup(g.id,-1)} disabled={idx===0}>▲</button>
-                      <button style={{background:"none",border:"none",color:idx===artworkGroups.length-1?"#333":"#888",cursor:idx===artworkGroups.length-1?"default":"pointer",fontSize:10,padding:"1px 4px",lineHeight:1}}
+                      <button style={{background:"none",border:"none",color:idx===artworkGroups.length-1?"#5E6367":"#5E6367",cursor:idx===artworkGroups.length-1?"default":"pointer",fontSize:10,padding:"1px 4px",lineHeight:1}}
                         onClick={()=>moveGroup(g.id,1)} disabled={idx===artworkGroups.length-1}>▼</button>
                     </div>
                     {/* グループ名 */}
@@ -6853,23 +6929,23 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
                       />
                     ) : (
                       <div style={{flex:1,minWidth:0}}>
-                        <span style={{fontSize:14,fontFamily:"sans-serif",color:"#e2e0f0"}}>{g.name}</span>
-                        <span style={{fontSize:12,color:"#888",fontFamily:"sans-serif",marginLeft:8}}>{cnt}名</span>
+                        <span style={{fontSize:14,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",color:"#1a1919"}}>{g.name}</span>
+                        <span style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginLeft:8}}>{cnt}名</span>
                       </div>
                     )}
                     {/* 操作ボタン */}
                     {isEditing ? (
                       <>
-                        <button style={{background:"none",border:"none",color:"#4ade80",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+                        <button style={{background:"none",border:"none",color:"#22c55e",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                           onClick={saveGroupEdit}>保存</button>
-                        <button style={{background:"none",border:"none",color:"#888",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+                        <button style={{background:"none",border:"none",color:"#5E6367",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                           onClick={()=>setEditingGroupId(null)}>取消</button>
                       </>
                     ) : (
                       <>
-                        <button style={{background:"none",border:"none",color:"#a78bfa",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+                        <button style={{background:"none",border:"none",color:"#5A57A6",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                           onClick={()=>{setEditingGroupId(g.id);setEditingGroupName(g.name);}}>編集</button>
-                        <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+                        <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
                           onClick={()=>setConfirmDeleteGroupId(g.id)}>削除</button>
                       </>
                     )}
@@ -6884,8 +6960,171 @@ function ArtistSettings({ artists, artworks, artworkGroups, onSaveArtists, onSav
   );
 }
 
+// ─── 取引先種別設定 ─────────────────────────────────────────
+function CpTypeSettings({ counterpartyTypes, counterparties, onSaveTypes, onSaveCounterparties, nextId, onNextId }) {
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState<"individual"|"corporate">("individual");
+  const [editingId, setEditingId] = useState<number|null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<"individual"|"corporate">("individual");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number|null>(null);
+
+  const addType = () => {
+    const name = newName.trim();
+    if (!name) return;
+    onSaveTypes([...counterpartyTypes, { id: nextId, name, category: newCategory }]);
+    onNextId(nextId + 1);
+    setNewName(""); setNewCategory("individual");
+  };
+
+  const startEdit = (t) => { setEditingId(t.id); setEditingName(t.name); setEditingCategory(t.category); };
+  const saveEdit = () => {
+    const name = editingName.trim();
+    if (!name || editingId === null) return;
+    onSaveTypes(counterpartyTypes.map(t => t.id===editingId ? {...t, name, category:editingCategory} : t));
+    setEditingId(null); setEditingName("");
+  };
+
+  const targetType = counterpartyTypes.find(t=>t.id===confirmDeleteId);
+  const typeCpCount = confirmDeleteId !== null
+    ? counterparties.filter(c=>c.type_id===confirmDeleteId).length : 0;
+
+  const doDelete = () => {
+    if (confirmDeleteId === null) return;
+    // 種別削除時：所属取引先のtype_idはnull（未分類）に戻す
+    onSaveCounterparties(counterparties.map(c => c.type_id===confirmDeleteId ? {...c, type_id:null} : c));
+    onSaveTypes(counterpartyTypes.filter(t=>t.id!==confirmDeleteId));
+    setConfirmDeleteId(null);
+  };
+
+  // 種別の並び替え
+  const moveType = (id: number, dir: -1|1) => {
+    const idx = counterpartyTypes.findIndex(t=>t.id===id);
+    if (idx < 0) return;
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= counterpartyTypes.length) return;
+    const next = [...counterpartyTypes];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    onSaveTypes(next);
+  };
+
+  return (
+    <div style={{maxWidth:560}}>
+
+      {/* 削除確認ダイアログ */}
+      {confirmDeleteId !== null && (
+        <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.6)"}}>
+          <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:12,padding:"28px 32px",maxWidth:400,width:"90%",textAlign:"center"}}>
+            <div style={{fontSize:18,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:8}}>種別を削除</div>
+            <div style={{fontSize:14,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:24,lineHeight:1.8}}>
+              <span style={{color:"#1a1919",fontWeight:"bold"}}>「{targetType?.name}」</span> を削除します。<br/>
+              {typeCpCount > 0 && (
+                <span>この種別の取引先 <span style={{color:"#f59e0b",fontWeight:"bold"}}>{typeCpCount}件</span> は未分類になります。<br/></span>
+              )}
+              この操作は取り消せません。
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+              <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#C6C6C8",color:"#5E6367",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                onClick={()=>setConfirmDeleteId(null)}>キャンセル</button>
+              <button style={{padding:"8px 24px",borderRadius:6,border:"none",background:"#f87171",color:"#fff",cursor:"pointer",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                onClick={doDelete}>削除する</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:16,lineHeight:1.6}}>
+        取引先の種別を自由に追加・編集できます。「個人系」は氏名を、「法人系」は会社名を主な表示名として使用します。
+      </div>
+
+      {/* 新規種別追加 */}
+      <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+        <input
+          style={{...S.formInput,flex:1,minWidth:140}}
+          placeholder="新しい種別名（例：オークションハウス）"
+          value={newName}
+          onChange={e=>setNewName(e.target.value)}
+          onKeyDown={e=>{if(e.key==="Enter")addType();}}
+        />
+        <select style={{...S.formInput,width:120}} value={newCategory} onChange={e=>setNewCategory(e.target.value as "individual"|"corporate")}>
+          <option value="individual">個人系</option>
+          <option value="corporate">法人系</option>
+        </select>
+        <button
+          style={{padding:"8px 16px",borderRadius:6,border:"none",background:newName.trim()?"#5A57A6":"#C6C6C8",color:newName.trim()?"#fff":"#5E6367",cursor:newName.trim()?"pointer":"default",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",whiteSpace:"nowrap"}}
+          onClick={addType} disabled={!newName.trim()}>
+          ＋ 追加
+        </button>
+      </div>
+
+      {/* 種別一覧 */}
+      {counterpartyTypes.length===0 ? (
+        <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"20px 0",textAlign:"center"}}>種別がまだありません</div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:0}}>
+          {counterpartyTypes.map((t,idx)=>{
+            const cnt = counterparties.filter(c=>c.type_id===t.id).length;
+            const isEditing = editingId===t.id;
+            return (
+              <div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:"1px solid #C6C6C8",flexWrap:"wrap"}}>
+                {/* 並び替えボタン */}
+                <div style={{display:"flex",flexDirection:"column",gap:1,flexShrink:0}}>
+                  <button style={{background:"none",border:"none",color:"#5E6367",cursor:idx===0?"default":"pointer",fontSize:10,padding:"1px 4px",lineHeight:1}}
+                    onClick={()=>moveType(t.id,-1)} disabled={idx===0}>▲</button>
+                  <button style={{background:"none",border:"none",color:"#5E6367",cursor:idx===counterpartyTypes.length-1?"default":"pointer",fontSize:10,padding:"1px 4px",lineHeight:1}}
+                    onClick={()=>moveType(t.id,1)} disabled={idx===counterpartyTypes.length-1}>▼</button>
+                </div>
+                {/* 種別名・カテゴリ */}
+                {isEditing ? (
+                  <>
+                    <input
+                      style={{...S.formInput,flex:1,minWidth:100,height:30,padding:"4px 10px"}}
+                      value={editingName}
+                      onChange={e=>setEditingName(e.target.value)}
+                      onKeyDown={e=>{if(e.key==="Enter")saveEdit();if(e.key==="Escape"){setEditingId(null);}}}
+                      autoFocus
+                    />
+                    <select style={{...S.formInput,width:100,height:30,padding:"4px 8px"}} value={editingCategory} onChange={e=>setEditingCategory(e.target.value as "individual"|"corporate")}>
+                      <option value="individual">個人系</option>
+                      <option value="corporate">法人系</option>
+                    </select>
+                  </>
+                ) : (
+                  <div style={{flex:1,minWidth:0}}>
+                    <span style={{fontSize:14,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",color:"#1a1919"}}>{t.name}</span>
+                    <span style={{fontSize:11,color:"#5A57A6",border:"1px solid #5A57A644",borderRadius:3,padding:"0 4px",lineHeight:"16px",marginLeft:8}}>
+                      {t.category==="individual"?"個人系":"法人系"}
+                    </span>
+                    <span style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginLeft:8}}>{cnt}件</span>
+                  </div>
+                )}
+                {/* 操作ボタン */}
+                {isEditing ? (
+                  <>
+                    <button style={{background:"none",border:"none",color:"#22c55e",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                      onClick={saveEdit}>保存</button>
+                    <button style={{background:"none",border:"none",color:"#5E6367",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                      onClick={()=>setEditingId(null)}>取消</button>
+                  </>
+                ) : (
+                  <>
+                    <button style={{background:"none",border:"none",color:"#5A57A6",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                      onClick={()=>startEdit(t)}>編集</button>
+                    <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                      onClick={()=>setConfirmDeleteId(t.id)}>削除</button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── 作家登録・編集フォーム ────────────────────────────────
-function ArtistForm({ artists, artworkGroups=[], editId, onSave, nextId, onNextId, onDone }) {
+function ArtistForm({ artists, artworkGroups=[], editId, onSave, nextId, onNextId, onDone, isMobile=false }) {
   const existing = editId ? artists.find(a=>a.id===editId) : null;
   const [form, setForm] = useState({
     name:      existing?.name      ?? "",
@@ -6908,7 +7147,7 @@ function ArtistForm({ artists, artworkGroups=[], editId, onSave, nextId, onNextI
 
   return (
     <div style={{maxWidth:480}}>
-      <div style={S.formGrid}>
+      <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
         <Field label="作家名" required>
           <input style={S.formInput} placeholder="例：田中 誠" value={form.name}
             onChange={e=>setForm(p=>({...p,name:normalizeSpaces(e.target.value)}))} autoFocus/>
@@ -6937,7 +7176,7 @@ function ArtistForm({ artists, artworkGroups=[], editId, onSave, nextId, onNextI
           {editId ? "保存する" : "登録する"}
         </button>
         <button
-          style={{...S.submitBtn,marginTop:0,background:"#2a2a40",color:"#ccc"}}
+          style={{...S.submitBtn,marginTop:0,background:"#C6C6C8",color:"#5E6367"}}
           onClick={onDone}>キャンセル</button>
       </div>
     </div>
@@ -6988,10 +7227,10 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
           onChange={e=>{onChange(e.target.value,null,"");setCursor(-1);}}
           onFocus={()=>setOpen(true)}
           onKeyDown={handleKey}/>
-        <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#a78bfa",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
+        <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
           onClick={()=>setOpen(o=>!o)}>▾</button>
       </div>
-      {artistId&&<div style={{fontSize:12,color:"#a78bfa",fontFamily:"sans-serif",marginTop:2}}>✓ 作家ID：{artistId}</div>}
+      {artistId&&<div style={{fontSize:12,color:"#5A57A6",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginTop:2}}>✓ 作家ID：{artistId}</div>}
       {open&&(
         <div style={S.cpDropdown}>
           {!showQuick ? (<>
@@ -6999,28 +7238,28 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
               placeholder="絞り込み（フリガナ可）…" value={q} onChange={e=>{setQ(e.target.value);setCursor(-1);}} onKeyDown={handleKey} autoFocus/>
             <div style={{maxHeight:200,overflowY:"auto"}}>
               {filtered.map((a,i)=>(
-                <div key={a.id} style={{...S.cpDropdownItem,...(cursor===i?{background:"#1e1e30"}:{})}}
+                <div key={a.id} style={{...S.cpDropdownItem,...(cursor===i?{background:"#efeeeb"}:{})}}
                   onClick={()=>selectArtist(a)}
                   onMouseEnter={()=>setCursor(i)}
                   onMouseLeave={()=>{}}>
-                  <span style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",width:36,flexShrink:0}}>{a.artist_id}</span>
+                  <span style={{fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919",width:36,flexShrink:0}}>{a.artist_id}</span>
                   <div>
                     <span style={{fontWeight:600}}>{a.name}</span>
-                    <span style={{fontSize:12,color:"#ccc",marginLeft:6,fontFamily:"sans-serif"}}>{a.name_kana}</span>
+                    <span style={{fontSize:12,color:"#5E6367",marginLeft:6,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{a.name_kana}</span>
                   </div>
                 </div>
               ))}
-              {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:12,color:"#aaa",fontFamily:"sans-serif"}}>見つかりません</div>}
+              {filtered.length===0&&<div style={{padding:"10px 12px",fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>見つかりません</div>}
             </div>
             {onQuickRegister && (
-              <button style={{...S.cpDropdownClose,color:"#a78bfa",borderTop:"1px solid #1e1e30"}}
+              <button style={{...S.cpDropdownClose,color:"#5A57A6",borderTop:"1px solid #C6C6C8"}}
                 onClick={()=>{setShowQuick(true);setQuickForm({name:q,name_kana:""});}}>
                 ＋ 新規作家として登録
               </button>
             )}
             <button style={S.cpDropdownClose} onClick={()=>{setOpen(false);setQ("");}}>閉じる</button>
           </>) : (<>
-            <div style={{padding:"10px 12px 6px",fontSize:12,color:"#a78bfa",fontFamily:"sans-serif",letterSpacing:"0.05em"}}>新規作家登録</div>
+            <div style={{padding:"10px 12px 6px",fontSize:12,color:"#5A57A6",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",letterSpacing:"0.05em"}}>新規作家登録</div>
             <div style={{padding:"0 10px 8px",display:"flex",flexDirection:"column",gap:8}}>
               <input style={{...S.formInput,fontSize:12}} placeholder="作家名 *（必須）"
                 value={quickForm.name} onChange={e=>setQuickForm(p=>({...p,name:normalizeSpaces(e.target.value)}))}/>
@@ -7033,7 +7272,7 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
                   style={{...S.submitBtn,marginTop:0,padding:"7px 14px",fontSize:12,flex:1,...(!canRegister?S.submitDisabled:{})}}
                   onClick={handleQuickRegister}
                   disabled={!canRegister}>登録</button>
-                <button style={{...S.cpDropdownClose,border:"1px solid #2a2a40",borderRadius:8,padding:"7px 14px",width:"auto"}}
+                <button style={{...S.cpDropdownClose,border:"1px solid #C6C6C8",borderRadius:8,padding:"7px 14px",width:"auto"}}
                   onClick={()=>setShowQuick(false)}>戻る</button>
               </div>
             </div>
@@ -7122,7 +7361,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
   const totalPrice = selectedItems.reduce((s,i) => s + (Number(i.price)||0), 0);
   const totalTax   = selectedItems.reduce((s,i) => s + (Number(i.tax)||0), 0);
   const totalExcl  = totalPrice - totalTax;
-  const canSave    = selectedItems.length > 0 && buyerName && soldDate
+  const canSave    = selectedItems.length > 0 && buyerName && isRealDate(soldDate)
     && selectedItems.every(i => i.price !== "" && i.price != null && Number(i.price) > 0);
 
   const handleSave = () => {
@@ -7146,7 +7385,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <div style={{width:"100%"}}>
             <label style={SF.label}>売上日 <span style={SF.required}>*</span></label>
-            <input style={{...S.formInput, marginTop:6, display:"block", width:"100%", boxSizing:"border-box", WebkitAppearance:"none", appearance:"none"}} type="date" value={soldDate} onChange={e=>setSoldDate(e.target.value)}/>
+            <SplitDateInput value={soldDate} onChange={(val)=>setSoldDate(val)}/>
           </div>
           <div>
             <label style={SF.label}>売上先 <span style={SF.required}>*</span></label>
@@ -7154,9 +7393,9 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
               <input style={{...S.formInput,paddingRight:32}} placeholder="売上先を選択または入力"
                 value={buyerName} onChange={e=>{setBuyerName(e.target.value);setBuyerId(null);}}
                 onFocus={()=>setCpOpen(true)}/>
-              <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#a78bfa",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
+              <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>setCpOpen(o=>!o)}>▾</button>
-              {buyerId&&<div style={{fontSize:12,color:"#a78bfa",fontFamily:"sans-serif",marginTop:4}}>✓ 取引先DBと連携済み</div>}
+              {buyerId&&<div style={{fontSize:12,color:"#5A57A6",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginTop:4}}>✓ 取引先DBと連携済み</div>}
               {cpOpen&&(
                 <div style={S.cpDropdown}>
                   <input style={{...S.formInput,margin:"8px 8px 4px",width:"calc(100% - 16px)",fontSize:12,boxSizing:"border-box"}}
@@ -7165,7 +7404,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                     {filteredCps.map(c=>(
                       <div key={c.id} style={S.cpDropdownItem}
                         onClick={()=>{setBuyerName(cpDisplayName(c));setBuyerId(c.cp_id);setCpOpen(false);setCpQ("");}}
-                        onMouseEnter={e=>e.currentTarget.style.background="#1e1e30"}
+                        onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                         <span style={{fontWeight:600}}>{cpDisplayName(c)}</span>
                       </div>
@@ -7187,18 +7426,22 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
           value={artSearch} onChange={e=>{ setArtSearch(e.target.value); setArtTab("ALL"); }}/>
         <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:10,alignItems:"center"}}>
           <button style={{...IS.tab,...(artTab==="ALL"?IS.tabActive:{})}}
-            onClick={e=>{ setArtTab("ALL"); e.currentTarget.blur(); }}>
+            onClick={e=>{ setArtTab("ALL"); e.currentTarget.blur(); }}
+            onMouseEnter={e=>{ if(artTab!=="ALL"){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.boxShadow="0 0 0 1px #efeeeb"; } }}
+            onMouseLeave={e=>{ if(artTab!=="ALL"){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.boxShadow="0 0 0 1px #C6C6C8"; } }}>
             すべて <span style={IS.tabCount}>{allInStock.length}</span>
           </button>
           {visibleSaleGroups.length>0&&(
             <>
-              <span style={{width:1,height:18,background:"#2a2a40",flexShrink:0,margin:"0 2px"}}/>
+              <span style={{width:1,height:18,background:"#C6C6C8",flexShrink:0,margin:"0 2px"}}/>
               {visibleSaleGroups.map(g=>{
                 const key=`G:${g.id}`;
                 const cnt=allInStock.filter(a=>{const art=artists.find(ar=>ar.artist_id===a.artist_id);return art?.group_id===g.id;}).length;
                 return (
-                  <button key={key} style={{...IS.tab,...(artTab===key?IS.tabActive:{}),...(artTab===key?{boxShadow:"0 0 0 1px #818cf855",color:"#818cf8"}:{})}}
-                    onClick={e=>{ setArtTab(key); setArtSearch(""); e.currentTarget.blur(); }}>
+                  <button key={key} style={{...IS.tab,...(artTab===key?IS.tabActive:{}),...(artTab===key?{boxShadow:"0 0 0 1px #081319",color:"#fff"}:{})}}
+                    onClick={e=>{ setArtTab(key); setArtSearch(""); e.currentTarget.blur(); }}
+                    onMouseEnter={e=>{ if(artTab!==key){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.boxShadow="0 0 0 1px #efeeeb"; } }}
+                    onMouseLeave={e=>{ if(artTab!==key){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.boxShadow="0 0 0 1px #C6C6C8"; } }}>
                     {g.name} <span style={IS.tabCount}>{cnt}</span>
                   </button>
                 );
@@ -7207,12 +7450,14 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
           )}
           {visibleArtTabs.length>0&&(
             <>
-              <span style={{width:1,height:18,background:"#2a2a40",flexShrink:0,margin:"0 2px"}}/>
+              <span style={{width:1,height:18,background:"#C6C6C8",flexShrink:0,margin:"0 2px"}}/>
               {visibleArtTabs.map(row=>{
                 const cnt=noGroupInStock.filter(a=>getKanaRow(a.artist_kana||a.artist)===row.key).length;
                 return (
                   <button key={row.key} style={{...IS.tab,...(artTab===row.key?IS.tabActive:{})}}
-                    onClick={e=>{ setArtTab(row.key); setArtSearch(""); e.currentTarget.blur(); }}>
+                    onClick={e=>{ setArtTab(row.key); setArtSearch(""); e.currentTarget.blur(); }}
+                    onMouseEnter={e=>{ if(artTab!==row.key){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.boxShadow="0 0 0 1px #efeeeb"; } }}
+                    onMouseLeave={e=>{ if(artTab!==row.key){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.boxShadow="0 0 0 1px #C6C6C8"; } }}>
                     {row.label} <span style={IS.tabCount}>{cnt}</span>
                   </button>
                 );
@@ -7220,31 +7465,30 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
             </>
           )}
         </div>
-        <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",marginBottom:8,textAlign:"right"}}>{available.length}件</div>
+        <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:8,textAlign:"right"}}>{available.length}件</div>
 
-        <div style={{border:"1px solid #1e1e30",borderRadius:8,overflow:"hidden",maxHeight:320,overflowY:"auto"}}>
+        <div style={{border:"1px solid #C6C6C8",borderRadius:8,overflow:"hidden",maxHeight:320,overflowY:"auto"}}>
           {available.map((a,i) => {
             const sel = isSelected(a.artwork_id);
             return (
               <div key={a.artwork_id}
                 style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",cursor:"pointer",
-                  background: sel?"#0f1e30":i%2===0?"transparent":"#0a0a14",
+                  background: sel?"#EAF2FE":i%2===0?"transparent":"#F9F9F7",
                   outline: sel?"1px solid #38bdf844":"none", transition:"background 0.1s"}}
-                onMouseEnter={e=>{ if(!sel) e.currentTarget.style.background="#161622"; }}
-                onMouseLeave={e=>{ if(!sel) e.currentTarget.style.background=i%2===0?"transparent":"#0a0a14"; }}>
+                onClick={()=>toggleItem(a)}
+                onMouseEnter={e=>{ if(!sel) e.currentTarget.style.background="#efeeeb"; }}
+                onMouseLeave={e=>{ if(!sel) e.currentTarget.style.background=i%2===0?"transparent":"#F9F9F7"; }}>
                 <div style={{width:20,height:20,borderRadius:4,flexShrink:0,
-                  boxShadow:sel?"none":"0 0 0 1px #2a2a40",
+                  boxShadow:sel?"none":"0 0 0 1px #C6C6C8",
                   background:sel?"#38bdf8":"transparent",
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#fff"}}
-                  onClick={()=>toggleItem(a)}>
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#fff"}}>
                   {sel?"✓":""}
                 </div>
-                <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:10,overflow:"hidden"}}
-                  onClick={()=>toggleItem(a)}>
-                  <span style={{fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",fontWeight:700,flexShrink:0,width:70}}>{a.artwork_id}</span>
-                  <span style={{fontSize:12,color:"#bbb",flexShrink:0,whiteSpace:"nowrap"}}>{a.artist}</span>
+                <div style={{flex:1,minWidth:0,display:"flex",alignItems:"center",gap:10,overflow:"hidden"}}>
+                  <span style={{fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919",fontWeight:700,flexShrink:0,width:70}}>{a.artwork_id}</span>
+                  <span style={{fontSize:12,color:"#5E6367",flexShrink:0,whiteSpace:"nowrap"}}>{a.artist}</span>
                   <span style={{fontWeight:600,fontSize:14,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1}}>{a.title}</span>
-                  <span style={{color:"#34d399",fontSize:13,flexShrink:0,whiteSpace:"nowrap"}}>¥{Number(a.purchase_price).toLocaleString()}</span>
+                  <span style={{color:"#60a5fa",fontSize:13,flexShrink:0,whiteSpace:"nowrap"}}>¥{Number(a.purchase_price).toLocaleString()}</span>
                 </div>
                 {!sel&&<span style={{...S.statusBadge,background:STATUSES[a.status]?.color+"22",color:STATUSES[a.status]?.color,border:`1px solid ${STATUSES[a.status]?.color}44`,flexShrink:0,fontSize:12}}>
                   {STATUSES[a.status]?.label}
@@ -7252,7 +7496,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
               </div>
             );
           })}
-          {available.length===0&&<div style={{color:"#aaa",fontSize:13,padding:"24px",textAlign:"center"}}>該当する作品がありません</div>}
+          {available.length===0&&<div style={{color:"#5E6367",fontSize:13,padding:"24px",textAlign:"center"}}>該当する作品がありません</div>}
         </div>
       </div>
 
@@ -7261,14 +7505,14 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
         <div style={SF.section}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
             <div style={SF.sectionTitle} >③ 価格を確認・編集</div>
-            <span style={{fontSize:13,color:"#38bdf8",fontFamily:"sans-serif"}}>{selectedItems.length}点選択中</span>
+            <span style={{fontSize:13,color:"#38bdf8",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{selectedItems.length}点選択中</span>
           </div>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",minWidth:680}}>
               <thead>
-                <tr style={{borderBottom:"2px solid #2a2a40"}}>
+                <tr style={{borderBottom:"2px solid #C6C6C8"}}>
                   {["作品ID","作家","タイトル","売上価格","消費税額","税抜額","メモ",""].map(h=>(
-                    <th key={h} style={{padding:"8px 10px",textAlign:h==="売上価格"||h==="消費税額"||h==="税抜額"?"right":"left",fontSize:12,color:"#aaa",whiteSpace:"nowrap",fontWeight:600}}>{h}</th>
+                    <th key={h} style={{padding:"8px 10px",textAlign:h==="売上価格"||h==="消費税額"||h==="税抜額"?"right":"left",fontSize:12,color:"#5E6367",whiteSpace:"nowrap",fontWeight:600}}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -7277,9 +7521,9 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                   const a    = artworks.find(a=>a.artwork_id===item.artwork_id);
                   const excl = (Number(item.price)||0) - (Number(item.tax)||0);
                   return (
-                    <tr key={item.artwork_id} style={{borderBottom:"1px solid #1e1e30",background:i%2===0?"transparent":"#0a0a14"}}>
-                      <td style={{padding:"10px 10px",fontFamily:"'Courier New',monospace",fontSize:12,color:"#a78bfa",fontWeight:700,whiteSpace:"nowrap"}}>{a?.artwork_id}</td>
-                      <td style={{padding:"10px 10px",fontSize:12,color:"#bbb",whiteSpace:"nowrap"}}>{a?.artist}</td>
+                    <tr key={item.artwork_id} style={{borderBottom:"1px solid #C6C6C8",background:i%2===0?"transparent":"#F9F9F7"}}>
+                      <td style={{padding:"10px 10px",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:12,color:"#1a1919",fontWeight:700,whiteSpace:"nowrap"}}>{a?.artwork_id}</td>
+                      <td style={{padding:"10px 10px",fontSize:12,color:"#5E6367",whiteSpace:"nowrap"}}>{a?.artist}</td>
                       <td style={{padding:"10px 10px",fontWeight:600,fontSize:14,whiteSpace:"nowrap",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis"}}>{a?.title}</td>
                       <td style={{padding:"10px 10px",textAlign:"right"}}>
                         <input style={{...S.formInput,padding:"5px 8px",fontSize:14,textAlign:"right",width:110,fontWeight:600}}
@@ -7291,7 +7535,7 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                           type="number" value={item.tax}
                           onChange={e=>updateItem(item.artwork_id,"tax",e.target.value)}/>
                       </td>
-                      <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#aaa"}}>{fmt(excl)}</td>
+                      <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#5E6367"}}>{fmt(excl)}</td>
                       <td style={{padding:"10px 10px"}}>
                         <input style={{...S.formInput,padding:"5px 8px",fontSize:13,width:140}}
                           placeholder="備考など" value={item.memo||""}
@@ -7306,11 +7550,11 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
                 })}
               </tbody>
               <tfoot>
-                <tr style={{borderTop:"2px solid #2a2a40",background:"#0f0f18"}}>
-                  <td colSpan={3} style={{padding:"10px 10px",fontSize:13,color:"#aaa",fontWeight:600}}>{selectedItems.length}点 合計</td>
-                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:16,color:"#4ade80",fontWeight:700}}>{fmt(totalPrice)}</td>
+                <tr style={{borderTop:"2px solid #C6C6C8",background:"#FFFFFF"}}>
+                  <td colSpan={3} style={{padding:"10px 10px",fontSize:13,color:"#5E6367",fontWeight:600}}>{selectedItems.length}点 合計</td>
+                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:16,color:"#22c55e",fontWeight:700}}>{fmt(totalPrice)}</td>
                   <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#f59e0b"}}>{fmt(totalTax)}</td>
-                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#aaa"}}>{fmt(totalExcl)}</td>
+                  <td style={{padding:"10px 10px",textAlign:"right",fontSize:13,color:"#5E6367"}}>{fmt(totalExcl)}</td>
                   <td></td>
                   <td></td>
                 </tr>
@@ -7329,22 +7573,22 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
 }
 
 const SF = {
-  section:      { background:"#0f0f18", border:"1px solid #1e1e30", borderRadius:12, padding:"20px", marginBottom:16, boxSizing:"border-box", width:"100%" },
-  sectionTitle: { fontSize:13, fontWeight:700, color:"#a78bfa", fontFamily:"sans-serif", letterSpacing:"0.05em", marginBottom:14 },
+  section:      { background:"#F9F9F7", border:"1px solid #C6C6C8", borderRadius:12, padding:"20px", marginBottom:16, boxSizing:"border-box", width:"100%" },
+  sectionTitle: { fontSize:13, fontWeight:700, color:"#5A57A6", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em", marginBottom:14 },
   row:          { display:"flex", gap:16, flexWrap:"wrap" },
   field:        { display:"flex", flexDirection:"column", gap:6, flex:1, minWidth:140 },
-  label:        { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
+  label:        { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   required:     { color:"#f87171" },
 };
 
 
 // ─── 画廊情報設定 ─────────────────────────────────────────
-function GallerySettings({ galleryInfo, onSave }) {
+function GallerySettings({ galleryInfo, onSave, isMobile=false }) {
   const [form, setForm] = useState({ ...galleryInfo });
   const setF = (k,v) => setForm(p=>({...p,[k]:v}));
   return (
     <div style={{maxWidth:600}}>
-      <div style={S.formGrid}>
+      <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
         <Field label="画廊名" fullWidth><input style={S.formInput} placeholder="例：ギャラリー〇〇" value={form.name} onChange={e=>setF("name",e.target.value)}/></Field>
         <Field label="郵便番号"><input style={S.formInput} placeholder="例：100-0001" value={form.zip} onChange={e=>setF("zip",e.target.value)}/></Field>
         <Field label="住所"><input style={S.formInput} placeholder="例：東京都千代田区〇〇1-1-1" value={form.address} onChange={e=>setF("address",e.target.value)}/></Field>
@@ -7354,10 +7598,10 @@ function GallerySettings({ galleryInfo, onSave }) {
         <Field label="FAX"><input style={S.formInput} placeholder="例：03-1234-5679" value={form.fax} onChange={e=>setF("fax",e.target.value)}/></Field>
       </div>
       <div style={{...S.formSectionTitle, marginTop:28}}>事業年度</div>
-      <div style={{fontSize:12,color:"#ccc",fontFamily:"sans-serif",marginBottom:14,lineHeight:1.6}}>
+      <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:14,lineHeight:1.6}}>
         日計の「第N期」表示に使用します。開始月と第1期の基準年を設定してください。
       </div>
-      <div style={S.formGrid}>
+      <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
         <Field label="事業年度 開始月">
           <select style={S.formInput} value={form.fiscalStartMonth||9} onChange={e=>setF("fiscalStartMonth",Number(e.target.value))}>
             {[...Array(12)].map((_,i)=>(
@@ -7390,13 +7634,13 @@ function StaffSettings({ staffList, onSave, nextId, onNextId }) {
     <div style={{maxWidth:400}}>
       <div style={{display:"flex",flexDirection:"column",gap:0,marginBottom:20}}>
         {staffList.map(s => (
-          <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"1px solid #1e1e30"}}>
-            <span style={{fontSize:14,fontFamily:"sans-serif"}}>{s.name}</span>
-            <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"sans-serif"}}
+          <div key={s.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:"1px solid #C6C6C8"}}>
+            <span style={{fontSize:14,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{s.name}</span>
+            <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
               onClick={()=>remove(s.id)}>削除</button>
           </div>
         ))}
-        {staffList.length===0&&<div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"20px 0"}}>社員が登録されていません</div>}
+        {staffList.length===0&&<div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"20px 0"}}>社員が登録されていません</div>}
       </div>
       <div style={{display:"flex",gap:8}}>
         <input style={{...S.formInput,flex:1}} placeholder="氏名を入力" value={newName} onChange={e=>setNewName(e.target.value)}
@@ -7415,6 +7659,7 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
   const [transitional, setTransitional] = useState([...(taxSettings.transitionalRates||[])]);
   const [rounding, setRounding] = useState(taxSettings.rounding||"floor");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const toPercent = (r) => {
     if (r === 0) return "0";
@@ -7427,10 +7672,10 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
     const next = [...rates];
     if (field === "from") next[idx] = { ...next[idx], from: val };
     else { const n = parseFloat(val); next[idx] = { ...next[idx], rate: isNaN(n) ? 0 : n / 100 }; }
-    setRates(next); setSaved(false);
+    setRates(next); setSaved(false); setSaveError("");
   };
-  const addRate = () => { setRates([...rates, { from: "", rate: 0.10 }]); setSaved(false); };
-  const deleteRate = (idx) => { setRates(rates.filter((_,i)=>i!==idx)); setSaved(false); };
+  const addRate = () => { setRates([...rates, { from: "", rate: 0.10 }]); setSaved(false); setSaveError(""); };
+  const deleteRate = (idx) => { setRates(rates.filter((_,i)=>i!==idx)); setSaved(false); setSaveError(""); };
 
   // ── 経過措置の操作 ──
   const updateTR = (idx, field, val) => {
@@ -7438,15 +7683,21 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
     if (field === "rate") { const n = parseFloat(val); next[idx] = { ...next[idx], rate: isNaN(n) ? 0 : n / 100 }; }
     else if (field === "to") next[idx] = { ...next[idx], to: val === "" ? null : val };
     else next[idx] = { ...next[idx], from: val };
-    setTransitional(next); setSaved(false);
+    setTransitional(next); setSaved(false); setSaveError("");
   };
-  const addTR = () => { setTransitional([...transitional, { from: "", to: null, rate: 0.80 }]); setSaved(false); };
-  const deleteTR = (idx) => { setTransitional(transitional.filter((_,i)=>i!==idx)); setSaved(false); };
+  const addTR = () => { setTransitional([...transitional, { from: "", to: null, rate: 0.80 }]); setSaved(false); setSaveError(""); };
+  const deleteTR = (idx) => { setTransitional(transitional.filter((_,i)=>i!==idx)); setSaved(false); setSaveError(""); };
 
   const handleSave = () => {
+    const rateInvalid = rates.some(r => !isRealDate(r.from));
+    const trInvalid = transitional.some(t => !isRealDate(t.from) || (t.to && !isRealDate(t.to)));
+    if (rateInvalid || trInvalid) {
+      setSaveError("存在しない日付が含まれています。赤枠の項目を確認してください。");
+      return;
+    }
     const sortedRates = [...rates].sort((a,b)=>a.from.localeCompare(b.from));
     onSave({ rates: sortedRates, transitionalRates: transitional, rounding });
-    setRates(sortedRates); setSaved(true);
+    setRates(sortedRates); setSaved(true); setSaveError("");
     setTimeout(()=>setSaved(false), 2500);
   };
 
@@ -7462,21 +7713,21 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
   };
 
   // ── 共通スタイル ──
-  const block   = { background:"#0f0f18", border:"1px solid #1e1e30", borderRadius:8, padding: isMobile ? "16px" : "20px 24px", marginBottom:24 };
-  const ttl     = { fontSize:13, fontWeight:700, color:"#a78bfa", marginBottom:4 };
-  const desc    = { fontSize:12, color:"#888", marginBottom:16, lineHeight:1.6 };
+  const block   = { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding: isMobile ? "16px" : "20px 24px", marginBottom:24 };
+  const ttl     = { fontSize:13, fontWeight:700, color:"#5A57A6", marginBottom:4 };
+  const desc    = { fontSize:12, color:"#5E6367", marginBottom:16, lineHeight:1.6 };
   const inp     = { ...S.formInput, padding:"6px 10px", fontSize:13 };
-  const delBtn  = { background:"transparent", border:"1px solid #3a2020", borderRadius:4, color:"#f87171", fontSize:12, padding:"4px 10px", cursor:"pointer", whiteSpace:"nowrap" as const, fontFamily:"sans-serif" };
-  const addBtn  = { background:"transparent", border:"1px solid #2a2a40", borderRadius:6, color:"#a78bfa", fontSize:12, padding:"6px 14px", cursor:"pointer", marginTop:12, fontFamily:"sans-serif" };
+  const delBtn  = { background:"transparent", border:"1px solid #F6D9D9", borderRadius:4, color:"#f87171", fontSize:12, padding:"4px 10px", cursor:"pointer", whiteSpace:"nowrap" as const, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" };
+  const addBtn  = { background:"transparent", border:"1px solid #C6C6C8", borderRadius:6, color:"#5A57A6", fontSize:12, padding:"6px 14px", cursor:"pointer", marginTop:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" };
 
   // ── PC用テーブルスタイル ──
-  const th = { fontSize:11, color:"#888", fontWeight:400, textAlign:"left" as const, paddingBottom:8, borderBottom:"1px solid #1e1e30" };
-  const td = { paddingTop:8, paddingBottom:8, borderBottom:"1px solid #16161f", verticalAlign:"middle" as const };
+  const th = { fontSize:11, color:"#5E6367", fontWeight:400, textAlign:"left" as const, paddingBottom:8, borderBottom:"1px solid #C6C6C8" };
+  const td = { paddingTop:8, paddingBottom:8, borderBottom:"1px solid #C6C6C8", verticalAlign:"middle" as const };
 
   // ── スマホ用：1行カードスタイル ──
-  const mCard = { background:"#13131e", border:"1px solid #1e1e2a", borderRadius:8, padding:"12px", marginBottom:8, display:"flex", flexDirection:"column" as const, gap:10 };
+  const mCard = { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"12px", marginBottom:8, display:"flex", flexDirection:"column" as const, gap:10 };
   const mRow  = { display:"flex", alignItems:"center", gap:8 };
-  const mLab  = { fontSize:11, color:"#888", width:68, flexShrink:0, fontFamily:"sans-serif" };
+  const mLab  = { fontSize:11, color:"#5E6367", width:68, flexShrink:0, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" };
 
   return (
     <div style={{ maxWidth: isMobile ? "100%" : 720 }}>
@@ -7497,8 +7748,7 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
                 <div key={origIdx} style={mCard}>
                   <div style={mRow}>
                     <span style={mLab}>適用開始日</span>
-                    <input type="date" value={r.from} onChange={e=>updateRate(origIdx,"from",e.target.value)}
-                      style={{...inp, flex:1}} />
+                    <SplitDateInput value={r.from} onChange={(val)=>updateRate(origIdx,"from",val)} compact/>
                   </div>
                   <div style={mRow}>
                     <span style={mLab}>税率（%）</span>
@@ -7506,7 +7756,7 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
                       style={{...inp, width:80}} step="0.1" min="0" />
                   </div>
                   <div style={{...mRow, justifyContent:"space-between"}}>
-                    <span style={{fontSize:11, color:"#666", fontFamily:"sans-serif"}}>{rangeLabel(si)}</span>
+                    <span style={{fontSize:11, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{rangeLabel(si)}</span>
                     <button style={delBtn} onClick={()=>deleteRate(origIdx)}>削除</button>
                   </div>
                 </div>
@@ -7528,13 +7778,13 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
                 return (
                   <tr key={origIdx}>
                     <td style={{...td, paddingRight:12}}>
-                      <input type="date" value={r.from} onChange={e=>updateRate(origIdx,"from",e.target.value)} style={inp} />
+                      <SplitDateInput value={r.from} onChange={(val)=>updateRate(origIdx,"from",val)} compact/>
                     </td>
                     <td style={{...td, paddingRight:12, paddingLeft:8}}>
                       <input type="number" value={toPercent(r.rate)} onChange={e=>updateRate(origIdx,"rate",e.target.value)}
                         style={{...inp, width:72}} step="0.1" min="0" />
                     </td>
-                    <td style={{...td, fontSize:12, color:"#888", paddingLeft:16}}>{rangeLabel(si)}</td>
+                    <td style={{...td, fontSize:12, color:"#5E6367", paddingLeft:16}}>{rangeLabel(si)}</td>
                     <td style={{...td, textAlign:"right"}}>
                       <button style={delBtn} onClick={()=>deleteRate(origIdx)}>削除</button>
                     </td>
@@ -7561,13 +7811,11 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
               <div key={idx} style={mCard}>
                 <div style={mRow}>
                   <span style={mLab}>開始日</span>
-                  <input type="date" value={t.from} onChange={e=>updateTR(idx,"from",e.target.value)}
-                    style={{...inp, flex:1}} />
+                  <SplitDateInput value={t.from} onChange={(val)=>updateTR(idx,"from",val)} compact/>
                 </div>
                 <div style={mRow}>
                   <span style={mLab}>終了日</span>
-                  <input type="date" value={t.to??""} onChange={e=>updateTR(idx,"to",e.target.value)}
-                    style={{...inp, flex:1}} placeholder="無期限" />
+                  <SplitDateInput value={t.to??""} onChange={(val)=>updateTR(idx,"to",val)} compact/>
                 </div>
                 <div style={{...mRow, justifyContent:"space-between"}}>
                   <div style={mRow}>
@@ -7593,10 +7841,10 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
               {transitional.map((t, idx) => (
                 <tr key={idx}>
                   <td style={{...td, paddingRight:12}}>
-                    <input type="date" value={t.from} onChange={e=>updateTR(idx,"from",e.target.value)} style={inp} />
+                    <SplitDateInput value={t.from} onChange={(val)=>updateTR(idx,"from",val)} compact/>
                   </td>
                   <td style={{...td, paddingRight:12, paddingLeft:12}}>
-                    <input type="date" value={t.to??""} onChange={e=>updateTR(idx,"to",e.target.value)} style={inp} placeholder="無期限" />
+                    <SplitDateInput value={t.to??""} onChange={(val)=>updateTR(idx,"to",val)} compact/>
                   </td>
                   <td style={{...td, paddingRight:12, paddingLeft:12}}>
                     <input type="number" value={toPercent(t.rate)} onChange={e=>updateTR(idx,"rate",e.target.value)}
@@ -7615,13 +7863,15 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
 
       {/* ── 端数処理 ── */}
       <div style={{marginTop:24}}>
-        <div style={{fontSize:13,fontWeight:600,color:"#e2e0f0",fontFamily:"sans-serif",marginBottom:4}}>消費税の端数処理</div>
-        <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",marginBottom:10}}>税込価格から税額を逆算するときの端数処理方法です。</div>
+        <div style={{fontSize:13,fontWeight:600,color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:4}}>消費税の端数処理</div>
+        <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:10}}>税込価格から税額を逆算するときの端数処理方法です。</div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
           {[{v:"floor",l:"切り捨て"},{v:"round",l:"四捨五入"},{v:"ceil",l:"切り上げ"}].map(({v,l})=>(
             <button key={v}
               style={{...S.filterBtn,...(rounding===v?S.filterActive:{})}}
-              onClick={()=>setRounding(v)}>{l}</button>
+              onClick={()=>setRounding(v)}
+              onMouseEnter={e=>{ if(rounding!==v){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; } }}
+              onMouseLeave={e=>{ if(rounding!==v){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; } }}>{l}</button>
           ))}
         </div>
       </div>
@@ -7629,7 +7879,8 @@ function TaxSettings({ taxSettings, onSave, isMobile=false }) {
       {/* ── 保存ボタン ── */}
       <div style={{display:"flex", alignItems:"center", gap:12, marginTop:20}}>
         <button style={S.submitBtn} onClick={handleSave}>保存する</button>
-        {saved && <span style={{fontSize:12, color:"#4ade80", fontFamily:"sans-serif"}}>✓ 保存しました</span>}
+        {saved && <span style={{fontSize:12, color:"#22c55e", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>✓ 保存しました</span>}
+        {saveError && <span style={{fontSize:12, color:"#f87171", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{saveError}</span>}
       </div>
     </div>
   );
@@ -7685,7 +7936,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
   };
 
   const handleSale = () => {
-    if (!saleForm || !saleForm.buyer_name || !saleForm.price) return;
+    if (!saleForm || !saleForm.buyer_name || !saleForm.price || !isRealDate(saleForm.date)) return;
     onSale({
       artwork_id: saleForm.artwork_id,
       sold_price: Number(saleForm.price),
@@ -7697,7 +7948,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
   };
 
   if (consignments.length === 0) return (
-    <div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"60px 0",textAlign:"center"}}>委託案件がありません</div>
+    <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"60px 0",textAlign:"center"}}>委託案件がありません</div>
   );
 
   return (
@@ -7718,35 +7969,34 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
         }).length;
 
         return (
-          <div key={c.id} style={{background:"#0f0f18",border:"1px solid #1e1e30",borderRadius:10,padding:"16px"}}>
+          <div key={c.id} style={{position:"relative",background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:10,padding:"16px"}}>
+            <div style={{position:"absolute",top:16,right:16,fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",color:"#5E6367",textAlign:"right",lineHeight:1.6}}>
+              <div>#{String(c.id).padStart(4,"0")}</div>
+              <div>担当：{c.staff_name||"—"}</div>
+            </div>
             {/* ヘッダー */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10,flexWrap:"wrap",gap:8}}>
-              <div>
-                <div style={{fontSize:14,fontFamily:"sans-serif",fontWeight:700,color:"#e2e0f0",marginBottom:4,letterSpacing:"0.02em"}}>{c.date}</div>
-                <div style={{fontSize:12,fontFamily:"'Courier New',monospace",color:"#a78bfa",marginBottom:4}}>#{String(c.id).padStart(4,"0")} · 担当：{c.staff_name||"—"}</div>
-                <div style={{fontSize:16,fontFamily:"sans-serif",fontWeight:600,marginBottom:2}}>{c.consignee_name}</div>
-                <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",display:"flex",gap:10,flexWrap:"wrap"}}>
-                  {returnedCount>0&&<span style={{color:"#f87171"}}>返却済 {returnedCount}点</span>}
-                  {soldCount>0&&<span style={{color:"#4ade80"}}>売上済 {soldCount}点</span>}
-                </div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:14,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontWeight:700,color:"#1a1919",marginBottom:4,letterSpacing:"0.02em",paddingRight:100}}>{c.date}</div>
+              <div style={{fontSize:16,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontWeight:600,marginBottom:8,paddingRight:100}}>{c.consignee_name}</div>
+              <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:10}}>
+                委託{activeItems.length}点{returnedCount>0&&`・返却${returnedCount}点`}{soldCount>0&&`・売上${soldCount}点`}
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={{fontSize:12,color:"#38bdf8",fontFamily:"sans-serif"}}>{activeItems.length}点</span>
-                <button style={{...S.addEventBtn,color:"#f59e0b",borderColor:"#f59e0b44"}}
-                  onClick={()=>onEdit&&onEdit(c.id)}>✏ 編集</button>
-                <button style={{...S.addEventBtn}}
-                  onClick={()=>printConsignment(c,galleryInfo,counterparties)}>🖨 納品書</button>
+                <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
+                  onClick={()=>onEdit&&onEdit(c.id)}><span className="material-icons" style={{fontSize:14,verticalAlign:"middle",marginRight:4}}>{"\ue3c9"}</span>編集</button>
+                <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
+                  onClick={()=>printConsignment(c,galleryInfo,counterparties)}><span className="material-icons" style={{fontSize:14,verticalAlign:"middle",marginRight:4}}>{"\ue8ad"}</span>納品書</button>
                 {activeItems.length>0&&(
-                  <button style={{...S.addEventBtn,color:"#a78bfa",borderColor:"#a78bfa44"}}
+                  <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
                     onClick={()=>{ setExpandedId(isExpanded?null:c.id); setSaleForm(null); }}>
-                    {isExpanded?"▲ 閉じる":"↩ 委託戻り"}
+                    {isExpanded?"▲ 閉じる":<><span className="material-icons" style={{fontSize:14,verticalAlign:"middle",marginRight:4}}>{"\ue31b"}</span>委託戻り</>}
                   </button>
                 )}
               </div>
             </div>
 
             {/* 作品リスト */}
-            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            <div style={{display:"flex",flexDirection:"column",gap:isExpanded?6:2}}>
               {c.items.map((item,i)=>{
                 const artwork    = item.artwork_id ? artworks.find(a=>a.artwork_id===item.artwork_id) : null;
                 const isReturned = artwork && artwork.status==="in_stock";
@@ -7758,85 +8008,85 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
                 return (
                   <div key={i}>
                     <div style={{display:"flex",alignItems:"center",gap:10,fontSize:13,
-                      color:isReturned||isSold?"#555":"#ccc",
-                      padding:"8px 4px",borderBottom:"1px solid #13131e"}}>
+                      color:isReturned||isSold?"#5E6367":"#5E6367",
+                      padding:isExpanded?"16px 4px":"8px 4px",borderBottom:"1px solid #C6C6C8",
+                      cursor:(isExpanded && isActive && item.artwork_id)?"pointer":"default"}}
+                      onClick={()=>{ if(isExpanded && isActive && item.artwork_id) toggleReturn(c.id,item.artwork_id); }}>
 
-                      {/* 委託戻りモードのチェックボックス */}
+                      {/* 委託戻りモードのチェックボックス（見た目のみ、操作は行全体で受ける） */}
                       {isExpanded && isActive && item.artwork_id && (
-                        <div style={{width:18,height:18,borderRadius:4,flexShrink:0,cursor:"pointer",
-                          boxShadow:isChecked?"none":"0 0 0 1px #2a2a40",
-                          background:isChecked?"#a78bfa":"transparent",
-                          display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}
-                          onClick={()=>toggleReturn(c.id,item.artwork_id)}>
-                          {isChecked?"✓":""}
+                        <div style={{width:28,height:28,flexShrink:0,
+                          display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <div style={{width:18,height:18,borderRadius:4,
+                            boxShadow:isChecked?"none":"0 0 0 1px #C6C6C8",
+                            background:isChecked?"#1a1919":"transparent",
+                            display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}>
+                            {isChecked?"✓":""}
+                          </div>
                         </div>
                       )}
 
                       <span
-                        style={{flex:1,cursor:item.artwork_id?"pointer":"default",
-                          textDecoration:item.artwork_id?"underline":"none",
-                          textDecorationStyle:"dotted",textDecorationColor:"#555"}}
-                        onClick={()=>item.artwork_id&&onSelectArtwork&&onSelectArtwork(item.artwork_id)}>
+                        style={{flex:1,cursor:(!isExpanded && item.artwork_id)?"pointer":"inherit"}}
+                        onClick={()=>{ if(!isExpanded && item.artwork_id && onSelectArtwork) onSelectArtwork(item.artwork_id); }}>
                         {item.artist?`${item.artist}「${item.title}」`:item.title}
                       </span>
 
                       {/* 状態表示・売上ボタン */}
-                      {isReturned && <span style={{fontSize:11,color:"#f87171",flexShrink:0}}>返却済</span>}
-                      {isSold     && <span style={{fontSize:11,color:"#4ade80",flexShrink:0}}>売上済</span>}
+                      {isReturned && <span style={{fontSize:11,color:"#5E6367",flexShrink:0}}>返却済</span>}
+                      {isSold     && <span style={{fontSize:11,color:"#5E6367",flexShrink:0}}>売上済</span>}
                       {isActive   && !isExpanded && (
                         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                          <span style={{color:"#38bdf8",fontSize:13}}>{fmt(item.price)}</span>
+                          <span style={{color:"#1a1919",fontSize:13}}>{fmt(item.price)}</span>
                           <button
-                            style={{...S.addEventBtn,fontSize:11,padding:"3px 10px",color:"#4ade80",borderColor:"#4ade8044"}}
-                            onClick={()=>openSaleForm(item,artwork)}>
+                            style={{...S.addEventBtn,fontSize:11,padding:"3px 10px",color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}}
+                            onClick={(e)=>{e.stopPropagation();openSaleForm(item,artwork);}}>
                             売上登録
                           </button>
                         </div>
                       )}
                       {isActive && isExpanded && (
-                        <span style={{color:"#38bdf8",fontSize:13,flexShrink:0}}>{fmt(item.price)}</span>
+                        <span style={{color:"#1a1919",fontSize:13,flexShrink:0}}>{fmt(item.price)}</span>
                       )}
                     </div>
 
                     {/* 売上登録ミニフォーム */}
                     {isSaleOpen && (
-                      <div style={{background:"#0a1a0a",border:"1px solid #4ade8044",borderRadius:8,padding:"14px",margin:"4px 0 8px"}}>
-                        <div style={{fontSize:12,color:"#4ade80",fontFamily:"sans-serif",fontWeight:600,marginBottom:12}}>
+                      <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:8,padding:"14px",margin:"4px 0 8px"}}>
+                        <div style={{fontSize:12,color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontWeight:600,marginBottom:12}}>
                           売上登録：{item.artist}「{item.title}」
                         </div>
                         <div style={{display:"flex",flexDirection:"column",gap:10}}>
                           <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
                             <div style={{flex:1,minWidth:120}}>
-                              <div style={{fontSize:11,color:"#aaa",marginBottom:4,fontFamily:"sans-serif"}}>成約価格 (円)</div>
+                              <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>成約価格 (円)</div>
                               <input style={{...S.formInput,fontSize:14,textAlign:"right"}}
                                 type="number" value={saleForm.price}
                                 onChange={e=>setSaleForm(p=>({...p,price:Number(e.target.value),tax:calcTax(Number(e.target.value))}))}/>
                             </div>
                             <div style={{flex:1,minWidth:100}}>
-                              <div style={{fontSize:11,color:"#aaa",marginBottom:4,fontFamily:"sans-serif"}}>消費税額 (円)</div>
-                              <input style={{...S.formInput,fontSize:13,textAlign:"right",color:"#f59e0b"}}
+                              <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>消費税額 (円)</div>
+                              <input style={{...S.formInput,fontSize:13,textAlign:"right",color:"#1a1919"}}
                                 type="number" value={saleForm.tax}
                                 onChange={e=>setSaleForm(p=>({...p,tax:Number(e.target.value)}))}/>
                             </div>
                             <div style={{flex:1,minWidth:110}}>
-                              <div style={{fontSize:11,color:"#aaa",marginBottom:4,fontFamily:"sans-serif"}}>売上日</div>
-                              <input style={{...S.formInput,fontSize:13}}
-                                type="date" value={saleForm.date}
-                                onChange={e=>setSaleForm(p=>({...p,date:e.target.value}))}/>
+                              <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>売上日</div>
+                              <SplitDateInput value={saleForm.date} onChange={(val)=>setSaleForm(p=>({...p,date:val}))} compact/>
                             </div>
                           </div>
                           <div>
-                            <div style={{fontSize:11,color:"#aaa",marginBottom:4,fontFamily:"sans-serif"}}>売上先 *</div>
+                            <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>売上先 *</div>
                             <div style={{position:"relative"}}>
                               <div style={{display:"flex",gap:6}}>
                                 <input style={{...S.formInput,flex:1}} placeholder="売上先を選択または入力"
                                   value={saleForm.buyer_name}
                                   onChange={e=>setSaleForm(p=>({...p,buyer_name:e.target.value,buyer_id:null}))}
                                   onFocus={()=>setCpOpen(true)}/>
-                                <button type="button" style={{...S.formInput,padding:"0 10px",cursor:"pointer",flexShrink:0,color:"#a78bfa"}}
+                                <button type="button" style={{...S.formInput,width:"auto",padding:"0 10px",cursor:"pointer",flexShrink:0,color:"#5E6367"}}
                                   onClick={()=>setCpOpen(o=>!o)}>▾</button>
                               </div>
-                              {saleForm.buyer_id&&<div style={{fontSize:11,color:"#a78bfa",marginTop:2}}>✓ 取引先DBと連携済み</div>}
+                              {saleForm.buyer_id&&<div style={{fontSize:11,color:"#5E6367",marginTop:2}}>✓ 取引先DBと連携済み</div>}
                               {cpOpen&&(
                                 <div style={S.cpDropdown}>
                                   <input style={{...S.formInput,margin:"8px 8px 4px",width:"calc(100% - 16px)",fontSize:12,boxSizing:"border-box"}}
@@ -7845,7 +8095,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
                                     {filteredCps.map(cp=>(
                                       <div key={cp.id} style={S.cpDropdownItem}
                                         onClick={()=>{setSaleForm(p=>({...p,buyer_name:cpDisplayName(cp),buyer_id:cp.cp_id}));setCpOpen(false);setCpQ("");}}
-                                        onMouseEnter={e=>e.currentTarget.style.background="#1e1e30"}
+                                        onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
                                         onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                                         <span style={{fontWeight:600}}>{cpDisplayName(cp)}</span>
                                       </div>
@@ -7857,11 +8107,11 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
                             </div>
                           </div>
                           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
-                            <button style={{...S.submitBtn,marginTop:0,padding:"7px 16px",fontSize:12,background:"#1a1030",color:"#aaa",border:"1px solid #2a2a40"}}
+                            <button style={{...S.submitBtn,marginTop:0,padding:"7px 16px",fontSize:12,background:"#EFEFEF",color:"#5E6367",border:"1px solid #C6C6C8"}}
                               onClick={()=>setSaleForm(null)}>キャンセル</button>
                             <button style={{...S.submitBtn,marginTop:0,padding:"7px 16px",fontSize:12,
-                              ...(!saleForm.buyer_name||!saleForm.price?S.submitDisabled:{background:"#4ade80",color:"#000"})}}
-                              disabled={!saleForm.buyer_name||!saleForm.price}
+                              ...(!saleForm.buyer_name||!saleForm.price||!isRealDate(saleForm.date)?S.submitDisabled:{background:"#1a1919",color:"#fff"})}}
+                              disabled={!saleForm.buyer_name||!saleForm.price||!isRealDate(saleForm.date)}
                               onClick={handleSale}>登録する</button>
                           </div>
                         </div>
@@ -7874,9 +8124,9 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
 
             {/* 備考 */}
             {c.note && (
-              <div style={{marginTop:10,padding:"8px 10px",background:"#13131e",borderRadius:6,
-                fontSize:12,color:"#aaa",fontFamily:"sans-serif",lineHeight:"1.6",
-                borderLeft:"2px solid #2a2a40",whiteSpace:"pre-wrap"}}>
+              <div style={{marginTop:10,padding:"8px 10px",background:"#FFFFFF",borderRadius:6,
+                fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",lineHeight:"1.6",
+                borderLeft:"2px solid #C6C6C8",whiteSpace:"pre-wrap"}}>
                 {c.note}
               </div>
             )}
@@ -7885,12 +8135,12 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
             {isExpanded&&(
               <div style={{marginTop:12,display:"flex",justifyContent:"flex-end",gap:8}}>
                 <button style={{...S.submitBtn,marginTop:0,padding:"8px 20px",fontSize:13,
-                  background:"#1a1030",color:"#aaa",border:"1px solid #2a2a40"}}
+                  background:"#EFEFEF",color:"#5E6367",border:"1px solid #C6C6C8"}}
                   onClick={()=>{setExpandedId(null);setReturnIds(p=>({...p,[c.id]:[]}))}}>
                   キャンセル
                 </button>
                 <button style={{...S.submitBtn,marginTop:0,padding:"8px 20px",fontSize:13,
-                  ...(selectedIds.length===0?S.submitDisabled:{background:"#a78bfa"})}}
+                  ...(selectedIds.length===0?S.submitDisabled:{background:"#1a1919",color:"#fff"})}}
                   disabled={selectedIds.length===0}
                   onClick={()=>handleReturn(c)}>
                   委託戻り（{selectedIds.length}点）
@@ -7906,7 +8156,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
 
 
 // ─── 新規委託フォーム ─────────────────────────────────────
-function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nextId, editTarget=null, onSave }) {
+function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nextId, editTarget=null, onSave, isMobile=false }) {
   const fmt = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "";
   const today = () => new Date().toISOString().slice(0,10);
 
@@ -7946,7 +8196,7 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
   );
   const cpDisplayName = (cp) => cp ? (cp.name || cp.company || "—") : "—";
 
-  const canSave = consigneeName && date && items.length > 0;
+  const canSave = consigneeName && isRealDate(date) && items.length > 0;
 
   const handleSave = () => {
     const staffName = staffList.find(s=>s.id===staffId)?.name||"";
@@ -7966,9 +8216,9 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
   return (
     <div style={{maxWidth:760}}>
       {/* 基本情報 */}
-      <div style={S.formGrid}>
+      <div style={{...S.formGrid,...(isMobile?{gridTemplateColumns:"1fr"}:{})}}>
         <Field label="委託日">
-          <input style={S.formInput} type="date" value={date} onChange={e=>setDate(e.target.value)}/>
+          <SplitDateInput value={date} onChange={(val)=>setDate(val)}/>
         </Field>
         <Field label="担当者">
           <select style={S.formInput} value={staffId||""} onChange={e=>setStaffId(Number(e.target.value))}>
@@ -7982,10 +8232,10 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
               <input style={{...S.formInput,flex:1}} placeholder="委託先を選択または入力"
                 value={consigneeName} onChange={e=>{setConsigneeName(e.target.value);setConsigneeId(null);}}
                 onFocus={()=>setCpOpen(true)}/>
-              <button type="button" style={{...S.formInput,padding:"0 10px",cursor:"pointer",flexShrink:0,color:"#a78bfa"}}
+              <button type="button" style={{...S.formInput,padding:"0 10px",cursor:"pointer",flexShrink:0,width:"auto",color:"#1a1919"}}
                 onClick={()=>setCpOpen(o=>!o)}>▾</button>
             </div>
-            {consigneeId&&<div style={{fontSize:12,color:"#a78bfa",fontFamily:"sans-serif",marginTop:2}}>✓ 取引先DBと連携済み</div>}
+            {consigneeId&&<div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginTop:2}}>✓ 取引先DBと連携済み</div>}
             {cpOpen&&(
               <div style={S.cpDropdown}>
                 <input style={{...S.formInput,margin:"8px 8px 4px",width:"calc(100% - 16px)",fontSize:12,boxSizing:"border-box"}}
@@ -7994,7 +8244,7 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
                   {filteredCps.map(c=>(
                     <div key={c.id} style={S.cpDropdownItem}
                       onClick={()=>{setConsigneeName(cpDisplayName(c));setConsigneeId(c.cp_id);setCpOpen(false);setCpQ("");}}
-                      onMouseEnter={e=>e.currentTarget.style.background="#1e1e30"}
+                      onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                       <span style={{fontWeight:600}}>{cpDisplayName(c)}</span>
                     </div>
@@ -8017,51 +8267,51 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
 
       {/* 作品リスト */}
       <div style={{marginTop:24,marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontSize:12,color:"#a78bfa",fontFamily:"sans-serif",letterSpacing:"0.08em"}}>委託作品</div>
+        <div style={{fontSize:12,color:"#1a1919",fontWeight:600,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",letterSpacing:"0.08em"}}>委託作品</div>
         <div style={{display:"flex",gap:8}}>
-          <button style={S.addEventBtn} onClick={()=>setShowArtworkPicker(true)}>＋ 在庫から選択</button>
-          <button style={{...S.addEventBtn,color:"#94a3b8",borderColor:"#94a3b833"}} onClick={addFreeItem}>＋ 自由入力</button>
+          <button style={{...S.addEventBtn,color:"#1a1919",background:"#EFEFEF",borderColor:"#C6C6C8"}} onClick={()=>setShowArtworkPicker(true)}>＋ 在庫から選択</button>
+          <button style={{...S.addEventBtn,color:"#94a3b8",background:"transparent",borderColor:"#C6C6C8"}} onClick={addFreeItem}>＋ 自由入力</button>
         </div>
       </div>
 
       {/* 作品ピッカー */}
       {showArtworkPicker&&(
-        <div style={{background:"#0f0f18",border:"1px solid #2a2a40",borderRadius:10,padding:"12px",marginBottom:12}}>
+        <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:10,padding:"12px",marginBottom:12}}>
           <input style={{...S.formInput,width:"100%",boxSizing:"border-box",marginBottom:8}}
             placeholder="作品名・作家で検索…" value={artworkSearch} onChange={e=>setArtworkSearch(e.target.value)} autoFocus/>
           <div style={{maxHeight:200,overflowY:"auto",display:"flex",flexDirection:"column",gap:1}}>
             {filteredArtworks.map(a=>(
               <div key={a.artwork_id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 8px",cursor:"pointer",borderRadius:6,fontSize:13}}
-                onMouseEnter={e=>e.currentTarget.style.background="#1e1e30"}
+                onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}
                 onClick={()=>addArtworkItem(a)}>
                 <div>
                   <span style={{fontWeight:600,marginRight:8}}>{a.title}</span>
-                  <span style={{color:"#ccc",fontSize:12,fontFamily:"sans-serif"}}>{a.artist}</span>
+                  <span style={{color:"#5E6367",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{a.artist}</span>
                 </div>
-                <span style={{color:"#a78bfa",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:14}}>¥{Number(a.announce_price).toLocaleString()}</span>
+                <span style={{color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontSize:14}}>¥{Number(a.announce_price).toLocaleString()}</span>
               </div>
             ))}
-            {filteredArtworks.length===0&&<div style={{color:"#aaa",fontSize:12,fontFamily:"sans-serif",padding:"12px 0",textAlign:"center"}}>該当する在庫作品がありません</div>}
+            {filteredArtworks.length===0&&<div style={{color:"#5E6367",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"12px 0",textAlign:"center"}}>該当する在庫作品がありません</div>}
           </div>
           <button style={{...S.cpDropdownClose}} onClick={()=>{setShowArtworkPicker(false);setArtworkSearch("");}}>閉じる</button>
         </div>
       )}
 
-      {/* 作品テーブル */}
-      {items.length > 0 && (
+      {/* 作品テーブル（PC） */}
+      {!isMobile && items.length > 0 && (
         <div style={{overflowX:"auto",marginBottom:8}}>
-          <table style={{width:"100%",borderCollapse:"collapse",minWidth:560,fontSize:13,fontFamily:"sans-serif"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:560,fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>
             <thead>
-              <tr style={{borderBottom:"1px solid #2a2a40"}}>
+              <tr style={{borderBottom:"1px solid #C6C6C8"}}>
                 {["作家","タイトル","サイズ","発表価格","委託価格",""].map(h=>(
-                  <th key={h} style={{padding:"6px 8px",textAlign:h==="委託価格"||h==="発表価格"?"right":"left",fontSize:12,color:"#aaa",whiteSpace:"nowrap"}}>{h}</th>
+                  <th key={h} style={{padding:"6px 8px",textAlign:h==="委託価格"||h==="発表価格"?"right":"left",fontSize:12,color:"#5E6367",whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {items.map((item,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #13131e"}}>
+                <tr key={i} style={{borderBottom:"1px solid #C6C6C8"}}>
                   <td style={{padding:"6px 8px"}}>
                     {item.artwork_id
                       ? item.artist
@@ -8072,13 +8322,13 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
                       ? item.title
                       : <input style={{...S.formInput,padding:"4px 6px",fontSize:12}} value={item.title} onChange={e=>updateItem(i,"title",e.target.value)} placeholder="タイトル"/>}
                   </td>
-                  <td style={{padding:"6px 8px",color:"#ccc",fontSize:12}}>
+                  <td style={{padding:"6px 8px",color:"#5E6367",fontSize:12}}>
                     {item.artwork_id
                       ? item.size
                       : <input style={{...S.formInput,padding:"4px 6px",fontSize:12}} value={item.size} onChange={e=>updateItem(i,"size",e.target.value)} placeholder="サイズ"/>}
                   </td>
                   <td style={{padding:"6px 8px",textAlign:"right"}}>
-                    <input style={{...S.formInput,padding:"4px 6px",fontSize:13,textAlign:"right",width:100,color:"#a78bfa"}}
+                    <input style={{...S.formInput,padding:"4px 6px",fontSize:13,textAlign:"right",width:100,color:"#1a1919"}}
                       type="number" value={item.announce_price||""} placeholder="—"
                       onChange={e=>updateItem(i,"announce_price",Number(e.target.value))}/>
                   </td>
@@ -8087,7 +8337,7 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
                       type="number" value={item.price} onChange={e=>updateItem(i,"price",Number(e.target.value))}/>
                   </td>
                   <td style={{padding:"6px 8px",textAlign:"center"}}>
-                    <button style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",fontSize:14}} onClick={()=>removeItem(i)}>✕</button>
+                    <button style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:14}} onClick={()=>removeItem(i)}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -8095,9 +8345,46 @@ function ConsignmentForm({ artworks, counterparties, staffList, galleryInfo, nex
           </table>
         </div>
       )}
-      {items.length===0&&<div style={{color:"#aaa",fontSize:12,fontFamily:"sans-serif",padding:"20px 0",textAlign:"center",border:"1px dashed #2a2a40",borderRadius:8,marginBottom:12}}>作品を追加してください</div>}
 
-      <button style={{...S.submitBtn,...(!canSave?S.submitDisabled:{})}} onClick={handleSave} disabled={!canSave}>
+      {/* 作品カード（モバイル） */}
+      {isMobile && items.length > 0 && (
+        <div style={{marginBottom:8}}>
+          {items.map((item,i)=>(
+            <div key={i} style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:10,padding:"14px",marginBottom:10,position:"relative"}}>
+              <button style={{position:"absolute",top:12,right:12,background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:15}} onClick={()=>removeItem(i)}>✕</button>
+
+              {item.artwork_id ? (
+                <>
+                  <div style={{fontSize:15,fontWeight:600,marginBottom:2,paddingRight:24}}>{item.artist}</div>
+                  <div style={{fontSize:13,color:"#5E6367",marginBottom:2}}>{item.title}</div>
+                  <div style={{fontSize:12,color:"#94a3b8",marginBottom:12}}>{item.size}</div>
+                </>
+              ) : (
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12,paddingRight:24}}>
+                  <input style={{...S.formInput,fontSize:13}} value={item.artist} onChange={e=>updateItem(i,"artist",e.target.value)} placeholder="作家名"/>
+                  <input style={{...S.formInput,fontSize:13}} value={item.title} onChange={e=>updateItem(i,"title",e.target.value)} placeholder="タイトル"/>
+                  <input style={{...S.formInput,fontSize:12}} value={item.size} onChange={e=>updateItem(i,"size",e.target.value)} placeholder="サイズ"/>
+                </div>
+              )}
+
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:12,color:"#5E6367"}}>発表価格</span>
+                <input style={{...S.formInput,width:130,textAlign:"right",fontSize:13,color:"#1a1919"}}
+                  type="number" value={item.announce_price||""} placeholder="—"
+                  onChange={e=>updateItem(i,"announce_price",Number(e.target.value))}/>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#5E6367"}}>委託価格</span>
+                <input style={{...S.formInput,width:130,textAlign:"right",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}
+                  type="number" value={item.price} onChange={e=>updateItem(i,"price",Number(e.target.value))}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {items.length===0&&<div style={{color:"#5E6367",fontSize:12,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"20px 0",textAlign:"center",border:"1px dashed #C6C6C8",borderRadius:8,marginBottom:12}}>作品を追加してください</div>}
+
+      <button style={{...S.submitBtn,background:"#1a1919",...(!canSave?S.submitDisabled:{})}} onClick={handleSave} disabled={!canSave}>
         {editTarget ? "変更を保存する" : "委託を登録する"}
       </button>
     </div>
@@ -8365,7 +8652,7 @@ const getKanaRow = (kana) => {
   return null;
 };
 
-function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[], onSelect }) {
+function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[], isMobile=false, onSelect }) {
   const [activeTab, setActiveTab] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -8442,7 +8729,9 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
         {/* すべて */}
         <button
           style={{...IS.tab,...(activeTab==="ALL"?IS.tabActive:{})}}
-          onClick={e=>{ setActiveTab("ALL"); e.currentTarget.blur(); }}>
+          onClick={e=>{ setActiveTab("ALL"); e.currentTarget.blur(); }}
+          onMouseEnter={e=>{ if(activeTab!=="ALL"){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.boxShadow="0 0 0 1px #efeeeb"; } }}
+          onMouseLeave={e=>{ if(activeTab!=="ALL"){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.boxShadow="0 0 0 1px #C6C6C8"; } }}>
           すべて
           <span style={IS.tabCount}>{inStock.length}</span>
         </button>
@@ -8450,14 +8739,16 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
         {/* グループタブ */}
         {hasGroups && (
           <>
-            <span style={{width:1,height:18,background:"#2a2a40",flexShrink:0,margin:"0 2px"}}/>
+            <span style={{width:1,height:18,background:"#C6C6C8",flexShrink:0,margin:"0 2px"}}/>
             {visibleGroups.map(g => {
               const key = `G:${g.id}`;
               const cnt = sorted.filter(a=>{ const art=artists.find(ar=>ar.artist_id===a.artist_id); return art?.group_id===g.id; }).length;
               return (
                 <button key={key}
-                  style={{...IS.tab,...(activeTab===key?IS.tabActive:{}),...(activeTab===key?{boxShadow:"0 0 0 1px #818cf855",color:"#818cf8"}:{})}}
-                  onClick={e=>{ setActiveTab(key); setSearch(""); e.currentTarget.blur(); }}>
+                  style={{...IS.tab,...(activeTab===key?IS.tabActive:{}),...(activeTab===key?{boxShadow:"0 0 0 1px #081319",color:"#fff"}:{})}}
+                  onClick={e=>{ setActiveTab(key); setSearch(""); e.currentTarget.blur(); }}
+                  onMouseEnter={e=>{ if(activeTab!==key){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.boxShadow="0 0 0 1px #efeeeb"; } }}
+                  onMouseLeave={e=>{ if(activeTab!==key){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.boxShadow="0 0 0 1px #C6C6C8"; } }}>
                   {g.name}
                   <span style={IS.tabCount}>{cnt}</span>
                 </button>
@@ -8469,13 +8760,15 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
         {/* 頭文字タブ */}
         {hasKana && (
           <>
-            <span style={{width:1,height:18,background:"#2a2a40",flexShrink:0,margin:"0 2px"}}/>
+            <span style={{width:1,height:18,background:"#C6C6C8",flexShrink:0,margin:"0 2px"}}/>
             {visibleKanaTabs.map(row => {
               const cnt = noGroupSorted.filter(a => getKanaKey(a) === row.key).length;
               return (
                 <button key={row.key}
                   style={{...IS.tab,...(activeTab===row.key?IS.tabActive:{})}}
-                  onClick={e=>{ setActiveTab(row.key); setSearch(""); e.currentTarget.blur(); }}>
+                  onClick={e=>{ setActiveTab(row.key); setSearch(""); e.currentTarget.blur(); }}
+                  onMouseEnter={e=>{ if(activeTab!==row.key){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.boxShadow="0 0 0 1px #efeeeb"; } }}
+                  onMouseLeave={e=>{ if(activeTab!==row.key){ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.boxShadow="0 0 0 1px #C6C6C8"; } }}>
                   {row.label}
                   <span style={IS.tabCount}>{cnt}</span>
                 </button>
@@ -8486,13 +8779,13 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
       </div>
 
       {/* 件数表示 */}
-      <div style={{fontSize:12,color:"#aaa",fontFamily:"sans-serif",margin:"10px 0 16px",textAlign:"right"}}>
+      <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",margin:"10px 0 16px",textAlign:"right"}}>
         {filtered.length}件 / 在庫{inStock.length}件
       </div>
 
       {/* 作品リスト */}
       {Object.keys(groups).length === 0 ? (
-        <div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"40px 0",textAlign:"center"}}>
+        <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"40px 0",textAlign:"center"}}>
           該当する作品がありません
         </div>
       ) : (
@@ -8509,19 +8802,21 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
               <div style={IS.workList}>
                 {g.works.map((a, i) => (
                   <div key={a.artwork_id}
-                    style={{...IS.workRow,...(i%2===0?{}:{background:"#0d0d16"})}}
+                    style={{...IS.workRow,...(i%2===0?{}:{background:"#F9F9F7"})}}
                     onClick={()=>onSelect(a.artwork_id)}
-                    onMouseEnter={e=>e.currentTarget.style.background="#1a1a28"}
-                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"#0d0d16"}>
-                    <div style={IS.workId}>{a.artwork_id}</div>
-                    <div style={IS.workMain}>
-                      <div style={IS.workTitle}>{a.title}</div>
-                      <div style={IS.workMeta}>
-                        {a.medium    && <span style={IS.plainText}>{a.medium}</span>}
-                        {a.medium&&a.size&&<span style={IS.dot}>·</span>}
-                        {a.size      && <span style={{...IS.plainText,color:"#bbb",flexShrink:1,overflow:"hidden",textOverflow:"ellipsis"}}>{a.size}</span>}
+                    onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
+                    onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"transparent":"#F9F9F7"}>
+                    <div style={isMobile?{display:"flex",flexDirection:"column",alignItems:"flex-start",flex:1,minWidth:0}:{display:"contents"}}>
+                      <div style={IS.workId}>{a.artwork_id}</div>
+                      <div style={IS.workMain}>
+                        <div style={IS.workTitle}>{a.title}</div>
+                        <div style={isMobile?{display:"flex",flexDirection:"column",gap:1}:IS.workMeta}>
+                          {a.medium && <span style={IS.plainText}>{a.medium}</span>}
+                          {!isMobile && a.medium&&a.size&&<span style={IS.dot}>·</span>}
+                          {a.size  && <span style={{...IS.plainText,color:"#5E6367",flexShrink:1,overflow:"hidden",textOverflow:"ellipsis"}}>{a.size}</span>}
+                        </div>
+                        {a.appraisal && <div style={{marginTop:2}}><span style={IS.appraisalChip}>鑑 {a.appraisal}</span></div>}
                       </div>
-                      {a.appraisal && <div style={{marginTop:2}}><span style={IS.appraisalChip}>鑑 {a.appraisal}</span></div>}
                     </div>
                     <div style={IS.workRight}>
                       <span style={{...IS.statusBadge,
@@ -8531,25 +8826,25 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
                         {STATUSES[a.status]?.label}
                       </span>
                       <div style={IS.priceBlock}>
+                        <div style={IS.purchasedAt}>{a.purchased_at}</div>
+                        <div style={IS.priceRow}>
+                          <span style={IS.priceLabel}>仕入</span>
+                          <span style={{...IS.priceVal,fontSize:14,color:"#1a1919",fontWeight:600}}>{fmt(a.purchase_price)}</span>
+                        </div>
                         <div style={IS.priceRow}>
                           <span style={IS.priceLabel}>発表</span>
-                          <span style={{...IS.priceVal,color:"#a78bfa"}}>{fmt(a.announce_price)}</span>
+                          <span style={{...IS.priceVal,color:"#1a1919"}}>{fmt(a.announce_price)}</span>
                         </div>
                         {a.status === "consigned" && (<>
                           <div style={IS.priceRow}>
                             <span style={IS.priceLabel}>委託</span>
-                            <span style={{...IS.priceVal,color:"#818cf8"}}>{fmt(a.consignment_price)}</span>
+                            <span style={{...IS.priceVal,color:"#1a1919"}}>{fmt(a.consignment_price)}</span>
                           </div>
                           {a.consignee&&(
-                            <div style={{fontSize:12,color:"#818cf8",fontFamily:"sans-serif",textAlign:"right",opacity:0.8}}>{a.consignee}</div>
+                            <div style={{fontSize:12,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",textAlign:"right",opacity:0.8}}>{a.consignee}</div>
                           )}
                         </>)}
-                        <div style={IS.priceRow}>
-                          <span style={IS.priceLabel}>仕入</span>
-                          <span style={{...IS.priceVal,fontSize:14,color:"#34d399",fontWeight:600}}>{fmt(a.purchase_price)}</span>
-                        </div>
                       </div>
-                      <div style={IS.purchasedAt}>{a.purchased_at}</div>
                     </div>
                   </div>
                 ))}
@@ -8563,34 +8858,34 @@ function InventoryList({ artworks, counterparties, artists=[], artworkGroups=[],
 }
 
 const IS = {
-  searchBar:    { background:"#0f0f18", border:"1px solid #2a2a40", borderRadius:8, padding:"8px 14px", color:"#e2e0f0", fontSize:13, fontFamily:"sans-serif", outline:"none" },
+  searchBar:    { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 14px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none" },
   tabBar:       { display:"flex", gap:4, flexWrap:"wrap" },
-  tab:          { padding:"5px 10px", borderRadius:20, border:"none", boxShadow:"0 0 0 1px #2a2a40", background:"transparent", color:"#ccc", cursor:"pointer", fontSize:12, fontFamily:"sans-serif", display:"flex", alignItems:"center", gap:4, outline:"none" },
-  tabActive:    { background:"#1e1e30", color:"#e2e0f0", boxShadow:"0 0 0 1px #a78bfa55" },
-  tabCount:     { fontSize:12, color:"#bbb", fontFamily:"sans-serif" },
-  artistHeader: { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0 6px", borderBottom:"2px solid #a78bfa44", marginBottom:2 },
-  artistName:   { fontSize:17, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em" },
-  artistKana:   { fontSize:12, color:"#bbb", fontFamily:"sans-serif", letterSpacing:"0.06em" },
-  artistCount:  { fontSize:12, color:"#a78bfa", fontFamily:"sans-serif", flexShrink:0 },
+  tab:          { padding:"5px 10px", borderRadius:20, border:"none", boxShadow:"0 0 0 1px #C6C6C8", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", display:"flex", alignItems:"center", gap:4, outline:"none" },
+  tabActive:    { background:"#081319", color:"#fff", boxShadow:"0 0 0 1px #081319" },
+  tabCount:     { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  artistHeader: { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 0 12px", marginBottom:4 },
+  artistName:   { fontSize:17, fontWeight:700, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em" },
+  artistKana:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.06em" },
+  artistCount:  { fontSize:12, color:"#1a1919", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0 },
   workList:     { display:"flex", flexDirection:"column" },
-  workRow:      { display:"flex", alignItems:"center", gap:6, padding:"10px 4px", cursor:"pointer", transition:"background 0.15s", borderBottom:"1px solid #13131e" },
-  workId:       { fontFamily:"'Courier New',monospace", fontSize:14, color:"#a78bfa", letterSpacing:"0.02em", flexShrink:0, width:70, fontWeight:700 },
-  workMain:     { flex:1, minWidth:0, overflow:"hidden" },
+  workRow:      { display:"flex", alignItems:"flex-start", gap:6, padding:"10px 4px", cursor:"pointer", transition:"background 0.15s", borderBottom:"1px solid #C6C6C8" },
+  workId:       { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, color:"#1a1919", letterSpacing:"0.02em", flexShrink:0, width:70, fontWeight:700 },
+  workMain:     { flex:1, minWidth:0 },
   workTitle:    { fontWeight:600, fontSize:14, marginBottom:4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
   workMeta:     { display:"flex", gap:4, flexWrap:"nowrap", overflow:"hidden" },
-  metaChip:     { background:"#1e1e30", padding:"1px 6px", borderRadius:4, fontSize:12, color:"#ccc", fontFamily:"sans-serif", flexShrink:0, whiteSpace:"nowrap" },
-  sizeChip:     { background:"#141420", padding:"1px 6px", borderRadius:4, fontSize:12, color:"#bbb", fontFamily:"sans-serif", flexShrink:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", minWidth:0 },
+  metaChip:     { background:"#C6C6C8", padding:"1px 6px", borderRadius:4, fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0, whiteSpace:"nowrap" },
+  sizeChip:     { background:"#F9F9F7", padding:"1px 6px", borderRadius:4, fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", minWidth:0 },
   workRight:    { flexShrink:0, display:"flex", flexDirection:"column", alignItems:"stretch", gap:2, minWidth:150 },
-  statusBadge:  { padding:"2px 8px", borderRadius:20, fontSize:12, fontFamily:"sans-serif", whiteSpace:"nowrap", alignSelf:"flex-start" },
+  statusBadge:  { padding:"2px 8px", borderRadius:20, fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap", alignSelf:"flex-start" },
   priceBlock:   { display:"flex", flexDirection:"column", gap:2, alignItems:"flex-end" },
   priceRow:     { display:"flex", alignItems:"baseline", width:"100%" },
-  priceLabel:   { fontSize:12, color:"#aaa", fontFamily:"sans-serif", width:28, flexShrink:0, whiteSpace:"nowrap" },
+  priceLabel:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", width:28, flexShrink:0, whiteSpace:"nowrap" },
   priceVal:     { fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textAlign:"right", flex:1, whiteSpace:"nowrap" },
-  consignee:    { fontSize:12, color:"#38bdf8", fontFamily:"sans-serif", textAlign:"right", maxWidth:90, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" },
-  purchasedAt:  { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  appraisalChip:{ background:"#f59e0b11", padding:"1px 6px", borderRadius:4, fontSize:12, color:"#f59e0b", fontFamily:"sans-serif", flexShrink:0, whiteSpace:"nowrap", border:"1px solid #f59e0b33" },
-  plainText:    { fontSize:12, color:"#ccc", fontFamily:"sans-serif", whiteSpace:"nowrap", flexShrink:0 },
-  dot:          { fontSize:12, color:"#444", fontFamily:"sans-serif", flexShrink:0 },
+  consignee:    { fontSize:12, color:"#38bdf8", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textAlign:"right", maxWidth:90, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" },
+  purchasedAt:  { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  appraisalChip:{ background:"#EEEEEC", padding:"3px 10px", borderRadius:999, fontSize:11, lineHeight:1.4, color:"#8D2728", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0, whiteSpace:"nowrap", border:"1px solid #D0D0CE", display:"inline-block" },
+  plainText:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap", flexShrink:0 },
+  dot:          { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0 },
 };
 
 
@@ -8598,6 +8893,15 @@ const IS = {
 function DailyReport({ artworks, history, counterparties, taxSettings, galleryInfo, isMobile, onSelectArtwork }) {
   const fmt  = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "—";
   const [expandedDate, setExpandedDate] = useState(null);
+
+  // 日付表示（日計ページのみ）：「2026年7月8日（水）」形式
+  const WEEKDAY_JA = ["日","月","火","水","木","金","土"];
+  const formatDayLabel = (dateStr) => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${WEEKDAY_JA[d.getDay()]}）`;
+  };
 
   // 事業年度設定（未設定時は旧来の9月/1970年をデフォルト）
   const fiscalStartMonth  = galleryInfo?.fiscalStartMonth  || 9;  // 1〜12
@@ -8613,18 +8917,89 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
     return true;
   };
 
-  // PC：作家・タイトル・サイズを1セルにまとめて表示
-  const ArtworkCell = ({ artwork }) => (
-    <td style={DR.tdArtwork}>
-      <div style={DR.tdArtworkArtist}>{artwork?.artist || "—"}</div>
-      <div style={DR.tdArtworkTitle}>{artwork?.title || "—"}</div>
-      {artwork?.size && <div style={DR.tdArtworkSize}>{artwork.size}</div>}
-    </td>
+  // PC：4行ミニグリッドの内側セル配置（ヘッダー／データ／合計で共有）
+  const variantStyle = () => DR.txnGridCols;
+
+  const GridCells = ({ variant, counterparty, id, artist, title, size, amount1, amount2, amount3, cost, profit }) => (
+    <>
+      <div style={DR.gCounterparty}>{counterparty}</div>
+      <div style={DR.gId}>{id}</div>
+      <div style={DR.gArtist}>{artist}</div>
+      <div style={DR.gTitle}>{title}</div>
+      <div style={DR.gSize}>{size}</div>
+      <div style={DR.gAmount1}>{amount1}</div>
+      <div style={DR.gAmount2}>{amount2}</div>
+      <div style={DR.gAmount3}>{amount3}</div>
+      {variant === "s" && (cost || profit) && (
+        <div style={DR.gCostProfit}>
+          {cost}
+          {profit}
+        </div>
+      )}
+    </>
+  );
+
+  // PC：グリッドデータ行（1取引=4行ブロック）
+  const TxnGridData = ({ variant, artwork, cpName, badge, amounts, cost, profit, bg, onClick }) => (
+    <div style={{...DR.txnGridRow, ...variantStyle(variant), ...DR.txnGridData, ...(bg ? {background:bg} : {})}} onClick={onClick}>
+      <GridCells variant={variant}
+        counterparty={<>
+          <div style={DR.gCpName}>{cpName || "—"}</div>
+          {badge}
+        </>}
+        id={<span style={DR.gIdVal}>{artwork?.artwork_id || "—"}</span>}
+        artist={<span style={DR.gTextVal}>{artwork?.artist || "—"}</span>}
+        title={<span style={DR.gTitleVal}>{artwork?.title || "—"}</span>}
+        size={<span style={DR.gSizeVal}>{artwork?.size || ""}</span>}
+        amount1={<span style={{...DR.gAmountMain, color: amounts[0].color || "#1a1919"}}>{amounts[0].value}</span>}
+        amount2={<div style={DR.gAmountRow}>
+          <span style={DR.gAmountRowLabel}>{amounts[1].label}</span>
+          <span style={{...DR.gAmountRowSub, color: amounts[1].color || "#5E6367"}}>{amounts[1].value}</span>
+        </div>}
+        amount3={<div style={DR.gAmountRow}>
+          <span style={DR.gAmountRowLabel}>{amounts[2].label}</span>
+          <span style={{...DR.gAmountRowTax, color: amounts[2].color || "#5E6367"}}>{amounts[2].value}</span>
+        </div>}
+        cost={cost && <span style={{...DR.gAmountRowSub, color: cost.color || "#5E6367"}}>{cost.value}</span>}
+        profit={profit && <span style={{...DR.gAmountMain, fontWeight:700, color: profit.color || "#1a1919"}}>{profit.value}</span>}
+      />
+    </div>
+  );
+
+  // PC：グリッド合計行
+  const TxnGridFoot = ({ variant, label, amounts, cost, profit }) => (
+    <div style={{...DR.txnGridRow, ...variantStyle(variant), ...DR.txnGridFoot}}>
+      <GridCells variant={variant}
+        counterparty={<span style={DR.gFootLabel}>{label}</span>}
+        id={null} artist={null} title={null} size={null}
+        amount1={<span style={{...DR.gAmountMain, fontWeight:700, color: amounts[0].color || "#1a1919"}}>{amounts[0].value}</span>}
+        amount2={<div style={DR.gAmountRow}>
+          <span style={DR.gAmountRowLabel}>{amounts[1].label}</span>
+          <span style={{...DR.gAmountRowSub, color: amounts[1].color || "#5E6367"}}>{amounts[1].value}</span>
+        </div>}
+        amount3={<div style={DR.gAmountRow}>
+          <span style={DR.gAmountRowLabel}>{amounts[2].label}</span>
+          <span style={{...DR.gAmountRowTax, color: amounts[2].color || "#5E6367"}}>{amounts[2].value}</span>
+        </div>}
+        cost={cost && <span style={{...DR.gAmountRowSub, color: cost.color || "#5E6367"}}>{cost.value}</span>}
+        profit={profit && <span style={{...DR.gAmountMain, fontWeight:700, color: profit.color || "#1a1919"}}>{profit.value}</span>}
+      />
+    </div>
+  );
+
+  // PC：グリッド見出し行（列ラベル）
+  const TxnGridHeader = ({ variant, cpLabel, amount1Label, showCostProfit=true }) => (
+    <div style={{...DR.txnGridRow, ...variantStyle(variant), ...DR.txnGridHeader}}>
+      <div style={DR.hCp}>{cpLabel}</div>
+      <div style={DR.hInfo}>作品情報</div>
+      <div style={DR.hAmt1}>{amount1Label}</div>
+      {variant==="s" && showCostProfit && <div style={DR.hCostProfit}>原価／売却損益</div>}
+    </div>
   );
 
   // スマホ：1取引=1カード
   const MobileTxnCard = ({ artwork, cpLabel, cpName, badge, bg, amounts, onClick }) => (
-    <div style={{...DR.card, background: bg || "#0a0a14"}} onClick={onClick}>
+    <div style={{...DR.card, background: bg || "#F9F9F7"}} onClick={onClick}>
       <div style={DR.cardTopRow}>
         <span style={DR.cardId}>{artwork?.artwork_id || "—"}</span>
         <div style={DR.cardCp}>
@@ -8639,7 +9014,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
         {amounts.map((a, i) => (
           <div key={i} style={DR.cardAmountCell}>
             <span style={DR.cardAmountLabel}>{a.label}</span>
-            <span style={{...DR.cardAmountVal, color: a.color || "#e2e0f0"}}>{a.value}</span>
+            <span style={{...DR.cardAmountVal, color: a.color || "#1a1919"}}>{a.value}</span>
           </div>
         ))}
       </div>
@@ -8738,7 +9113,13 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const rnd         = roundFn(taxSettings.rounding||"floor");
       const tax         = rnd(discountAmt - discountAmt / (1 + taxRate));
       const excl        = discountAmt - tax;
-      return { h, artwork, discountAmt, excl, tax };
+      const cost        = artwork?.purchase_price || 0;
+      const purchaseDate = artwork?.purchased_at || date;
+      const purchRate   = getTaxRate(purchaseDate, taxSettings.rates);
+      const costExcl    = rnd(cost - cost / (1 + purchRate));
+      // 売却損益＝値引きによる差額分のみ（値引きは売上を減らすのでマイナス）
+      const profitLoss  = -excl;
+      return { h, artwork, discountAmt, excl, tax, cost, costExcl, profitLoss };
     });
 
     // 売上値上げ行
@@ -8749,7 +9130,13 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       const rnd         = roundFn(taxSettings.rounding||"floor");
       const tax         = rnd(increaseAmt - increaseAmt / (1 + taxRate));
       const excl        = increaseAmt - tax;
-      return { h, artwork, increaseAmt, excl, tax };
+      const cost        = artwork?.purchase_price || 0;
+      const purchaseDate = artwork?.purchased_at || date;
+      const purchRate   = getTaxRate(purchaseDate, taxSettings.rates);
+      const costExcl    = rnd(cost - cost / (1 + purchRate));
+      // 売却損益＝値上げによる差額分のみ（値上げは売上を増やすのでプラス）
+      const profitLoss  = excl;
+      return { h, artwork, increaseAmt, excl, tax, cost, costExcl, profitLoss };
     });
 
     const purchaseTotal        = purchaseRows.reduce((s,r) => s + r.price, 0);
@@ -8797,7 +9184,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
   const sortedFiscalYears = Object.keys(fiscalGroups).map(Number).sort((a,b) => b - a);
 
   if (allDates.length === 0) return (
-    <div style={{color:"#aaa",fontSize:13,fontFamily:"sans-serif",padding:"60px 0",textAlign:"center"}}>取引データがありません</div>
+    <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"60px 0",textAlign:"center"}}>取引データがありません</div>
   );
 
   return (
@@ -8818,15 +9205,15 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
               <div style={DR.fiscalSummary}>
                 <div style={DR.fiscalCell}>
                   <span style={DR.fiscalLabel}>仕入総累計</span>
-                  <span style={{...DR.fiscalVal,color:"#60a5fa"}}>{fmt(fyPurchaseTotal)}</span>
+                  <span style={{...DR.fiscalVal,color:"#1a1919"}}>{fmt(fyPurchaseTotal)}</span>
                 </div>
                 <div style={DR.fiscalCell}>
                   <span style={DR.fiscalLabel}>売上総累計</span>
-                  <span style={{...DR.fiscalVal,color:"#4ade80"}}>{fmt(fySoldTotal)}</span>
+                  <span style={{...DR.fiscalVal,color:"#1a1919"}}>{fmt(fySoldTotal)}</span>
                 </div>
                 <div style={DR.fiscalCell}>
-                  <span style={DR.fiscalLabel}>差損益累計</span>
-                  <span style={{...DR.fiscalVal,color:fyProfitLoss>=0?"#a78bfa":"#f87171"}}>{fmt(fyProfitLoss)}</span>
+                  <span style={DR.fiscalLabel}>売却損益累計</span>
+                  <span style={{...DR.fiscalVal,color:"#1a1919"}}>{fmt(fyProfitLoss)}</span>
                 </div>
               </div>
             </div>
@@ -8840,38 +9227,51 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
             {/* 日付ヘッダー */}
             <div style={DR.dayHeader}
               onClick={()=>setExpandedDate(isExpanded ? null : date)}
-              onMouseEnter={e=>e.currentTarget.style.background="#0f0f18"}
-              onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
+              onMouseLeave={e=>e.currentTarget.style.background="#F9F9F7"}>
               <div style={DR.dayDateRow}>
-                <span style={DR.dayDate}>{date}</span>
+                <span style={DR.dayDate}>{formatDayLabel(date)}</span>
                 <span style={DR.expandIcon}>{isExpanded ? "▲" : "▼"}</span>
               </div>
-              <div style={{...DR.summaryGrid,gridTemplateColumns:"1fr 1fr"}}>
-                <div style={DR.summaryCell}>
-                  <span style={DR.summaryLabel}>仕入高
-                    {purchaseDiscountTotal>0&&<span style={{fontSize:12,color:"#38bdf8",marginLeft:4}}>▼{fmt(purchaseDiscountTotal)}</span>}
-                    {purchaseIncreaseTotal>0&&<span style={{fontSize:12,color:"#818cf8",marginLeft:4}}>▲{fmt(purchaseIncreaseTotal)}</span>}
-                  </span>
-                  <span style={{...DR.summaryVal,color:"#60a5fa"}}>{fmt(purchaseTotal - purchaseDiscountTotal + purchaseIncreaseTotal)}</span>
-                </div>
-                <div style={DR.summaryCell}>
-                  <span style={DR.summaryLabel}>売上高
-                    {soldDiscountTotal>0&&<span style={{fontSize:12,color:"#f59e0b",marginLeft:4}}>▼{fmt(soldDiscountTotal)}</span>}
-                    {soldIncreaseTotal>0&&<span style={{fontSize:12,color:"#34d399",marginLeft:4}}>▲{fmt(soldIncreaseTotal)}</span>}
-                  </span>
-                  <span style={{...DR.summaryVal,color:"#4ade80"}}>{fmt(soldTotal - soldDiscountTotal + soldIncreaseTotal)}</span>
-                </div>
-              </div>
+              {(()=>{
+                const dayPurchaseNet = purchaseTotal - purchaseDiscountTotal + purchaseIncreaseTotal;
+                const daySoldNet = soldTotal - soldDiscountTotal + soldIncreaseTotal;
+                // 売却損益＝売れた作品の売上（税抜）－その作品の原価（税抜）。
+                // その日の仕入総額（dayPurchaseNet）とは無関係（仕入だけの日は売却損益は発生しない）
+                const dayProfitLoss = soldExclTotal - costExclTotal;
+                return (
+                  <div style={DR.summaryGrid}>
+                    <div style={DR.summaryCell}>
+                      <span style={DR.summaryLabel}>仕入高
+                        {purchaseDiscountTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▼{fmt(purchaseDiscountTotal)}</span>}
+                        {purchaseIncreaseTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▲{fmt(purchaseIncreaseTotal)}</span>}
+                      </span>
+                      <span style={{...DR.summaryVal,color:"#1a1919"}}>{fmt(dayPurchaseNet)}</span>
+                    </div>
+                    <div style={DR.summaryCell}>
+                      <span style={DR.summaryLabel}>売上高
+                        {soldDiscountTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▼{fmt(soldDiscountTotal)}</span>}
+                        {soldIncreaseTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▲{fmt(soldIncreaseTotal)}</span>}
+                      </span>
+                      <span style={{...DR.summaryVal,color:"#1a1919"}}>{fmt(daySoldNet)}</span>
+                    </div>
+                    <div style={DR.summaryCell}>
+                      <span style={DR.summaryLabel}>売却損益高</span>
+                      <span style={{...DR.summaryVal,color:"#1a1919"}}>{fmt(dayProfitLoss)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 展開：明細 */}
-            {isExpanded && (
-              <div style={DR.detail}>
-
+            {isExpanded && (() => {
+              const purchaseSections = (
+              <>
                 {/* 仕入明細*/}
                 {purchaseRows.length > 0 && (
                   <div style={DR.section}>
-                    <div style={{...DR.sectionTitle,color:"#60a5fa"}}>仕入</div>
+                    <div style={{...DR.sectionTitle,color:"#1a1919"}}>仕入</div>
                     {isMobile ? (
                       <div style={DR.cardList}>
                         {purchaseRows.map(({h,artwork,price,excl,taxCredit,inv,creditRate}) => (
@@ -8880,58 +9280,38 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
                               ? <span style={DR.invoiceBadge}>✓ インボイス</span>
                               : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` ${(creditRate*100).toFixed(0)}%`:""}</span>}
                             amounts={[
-                              {label:"仕入額", value:fmt(price), color:"#60a5fa"},
+                              {label:"仕入額", value:fmt(price), color:"#1a1919"},
                               {label:"税抜金額", value:fmt(excl)},
-                              {label:"消費税額", value:fmt(taxCredit), color:"#f59e0b"},
+                              {label:"消費税額", value:fmt(taxCredit), color:"#5E6367"},
                             ]}
                             onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
                         ))}
                         <div style={DR.cardFootTotal}>
                           <span style={DR.tfootLabel}>仕入 合計</span>
-                          <span style={{...DR.tfootVal,color:"#60a5fa"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.price,0))}</span>
+                          <span style={{...DR.tfootVal,color:"#1a1919"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.price,0))}</span>
                         </div>
                       </div>
                     ) : (
-                    <div style={{overflowX:"auto"}}>
-                      <table style={DR.tbl}>
-                        <thead>
-                          <tr style={DR.thead}>
-                            <th style={DR.thId}>作品ID</th>
-                            <th style={DR.thText}>仕入先</th>
-                            <th style={DR.thArtwork}>作家・作品</th>
-                            <th style={DR.thNum}>仕入額</th>
-                            <th style={DR.thNum}>税抜金額</th>
-                            <th style={DR.thNum}>消費税額</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {purchaseRows.map(({h,artwork,price,excl,taxCredit,inv,creditRate},i)=>(
-                            <tr key={h.id} style={{...DR.trow,...(i%2===0?{}:{background:"#0d0d16"})}}
-                              onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
-                              <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
-                              <td style={DR.tdText}>
-                                <div>{h.counterparty||"—"}</div>
-                                {inv
-                                  ? <span style={DR.invoiceBadge}>✓ インボイス</span>
-                                  : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` ${(creditRate*100).toFixed(0)}%`:""}</span>
-                                }
-                              </td>
-                              <ArtworkCell artwork={artwork} />
-                              <td style={{...DR.tdNum,color:"#60a5fa"}}>{fmt(price)}</td>
-                              <td style={DR.tdNum}>{fmt(excl)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>{fmt(taxCredit)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={DR.tfoot}>
-                            <td colSpan={3} style={DR.tfootLabel}>仕入 合計</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#60a5fa"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.price,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal}}>{fmt(purchaseRows.reduce((s,r)=>s+r.excl,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>{fmt(purchaseRows.reduce((s,r)=>s+r.taxCredit,0))}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div style={DR.txnTable}>
+                      <TxnGridHeader variant="p" cpLabel="仕入先" amount1Label="仕入額" />
+                      {purchaseRows.map(({h,artwork,price,excl,taxCredit,inv,creditRate},i)=>(
+                        <TxnGridData key={h.id} variant="p" artwork={artwork} cpName={h.counterparty}
+                          bg={i%2===0?undefined:"#F9F9F7"}
+                          badge={inv
+                            ? <span style={DR.invoiceBadge}>✓ インボイス</span>
+                            : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` ${(creditRate*100).toFixed(0)}%`:""}</span>}
+                          amounts={[
+                            {label:"仕入額", value:fmt(price), color:"#1a1919"},
+                            {label:"税抜", value:fmt(excl)},
+                            {label:"消費税", value:fmt(taxCredit), color:"#5E6367"},
+                          ]}
+                          onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                      ))}
+                      <TxnGridFoot variant="p" label="仕入 合計" amounts={[
+                        {label:"仕入額", value:fmt(purchaseRows.reduce((s,r)=>s+r.price,0)), color:"#1a1919"},
+                        {label:"税抜", value:fmt(purchaseRows.reduce((s,r)=>s+r.excl,0))},
+                        {label:"消費税", value:fmt(purchaseRows.reduce((s,r)=>s+r.taxCredit,0)), color:"#5E6367"},
+                      ]} />
                     </div>
                     )}
                   </div>
@@ -8939,65 +9319,45 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
                 {/* 仕入値引き明細 */}
                 {purchaseDiscountRows.length > 0 && (
-                  <div style={{...DR.section,borderLeft:"2px solid #38bdf844"}}>
-                    <div style={{...DR.sectionTitle,color:"#38bdf8"}}>仕入値引き</div>
+                  <div style={DR.section}>
+                    <div style={{...DR.sectionTitle,color:"#1a1919"}}>仕入値引き</div>
                     {isMobile ? (
                       <div style={DR.cardList}>
                         {purchaseDiscountRows.map(({h,artwork,discountAmt,excl,taxCredit,inv,creditRate}) => (
-                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty} bg="#000a0f"
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty} bg="#F9F9F7"
                             badge={inv ? <span style={DR.invoiceBadge}>✓ インボイス</span>
                               : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` (${(creditRate*100).toFixed(0)}%控除)`:""}</span>}
                             amounts={[
-                              {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#38bdf8"},
-                              {label:"税抜金額", value:`-${fmt(excl)}`, color:"#38bdf8"},
-                              {label:"消費税額", value:`-${fmt(taxCredit)}`, color:"#f59e0b"},
+                              {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#1a1919"},
+                              {label:"税抜金額", value:`-${fmt(excl)}`, color:"#1a1919"},
+                              {label:"消費税額", value:`-${fmt(taxCredit)}`, color:"#5E6367"},
                             ]}
                             onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
                         ))}
                         <div style={DR.cardFootTotal}>
                           <span style={DR.tfootLabel}>値引き 合計</span>
-                          <span style={{...DR.tfootVal,color:"#38bdf8"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.discountAmt,0))}</span>
+                          <span style={{...DR.tfootVal,color:"#1a1919"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.discountAmt,0))}</span>
                         </div>
                       </div>
                     ) : (
-                    <div style={{overflowX:"auto"}}>
-                      <table style={DR.tbl}>
-                        <thead>
-                          <tr style={DR.thead}>
-                            <th style={DR.thId}>作品ID</th>
-                            <th style={DR.thText}>仕入先</th>
-                            <th style={DR.thArtwork}>作家・作品</th>
-                            <th style={DR.thNum}>値引き額</th>
-                            <th style={DR.thNum}>税抜金額</th>
-                            <th style={DR.thNum}>消費税額</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {purchaseDiscountRows.map(({h,artwork,discountAmt,excl,taxCredit,inv,creditRate},i)=>(
-                            <tr key={h.id} style={{...DR.trow,background:"#000a0f"}}
-                              onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
-                              <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
-                              <td style={DR.tdText}>
-                                <div>{h.counterparty||"—"}</div>
-                                {inv ? <span style={DR.invoiceBadge}>✓ インボイス</span>
-                                     : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` (${(creditRate*100).toFixed(0)}%控除)`:""}</span>}
-                              </td>
-                              <ArtworkCell artwork={artwork} />
-                              <td style={{...DR.tdNum,color:"#38bdf8"}}>-{fmt(discountAmt)}</td>
-                              <td style={{...DR.tdNum,color:"#38bdf8"}}>-{fmt(excl)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(taxCredit)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={DR.tfoot}>
-                            <td colSpan={3} style={DR.tfootLabel}>値引き 合計</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#38bdf8"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.discountAmt,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#38bdf8"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.excl,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(purchaseDiscountRows.reduce((s,r)=>s+r.taxCredit,0))}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div style={DR.txnTable}>
+                      <TxnGridHeader variant="p" cpLabel="仕入先" amount1Label="値引き額" />
+                      {purchaseDiscountRows.map(({h,artwork,discountAmt,excl,taxCredit,inv,creditRate})=>(
+                        <TxnGridData key={h.id} variant="p" artwork={artwork} cpName={h.counterparty} bg="#F9F9F7"
+                          badge={inv ? <span style={DR.invoiceBadge}>✓ インボイス</span>
+                            : <span style={DR.noInvoiceBadge}>未登録{creditRate<1?` (${(creditRate*100).toFixed(0)}%控除)`:""}</span>}
+                          amounts={[
+                            {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#1a1919"},
+                            {label:"税抜", value:`-${fmt(excl)}`, color:"#1a1919"},
+                            {label:"消費税", value:`-${fmt(taxCredit)}`, color:"#5E6367"},
+                          ]}
+                          onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                      ))}
+                      <TxnGridFoot variant="p" label="値引き 合計" amounts={[
+                        {label:"値引き額", value:`-${fmt(purchaseDiscountRows.reduce((s,r)=>s+r.discountAmt,0))}`, color:"#1a1919"},
+                        {label:"税抜", value:`-${fmt(purchaseDiscountRows.reduce((s,r)=>s+r.excl,0))}`, color:"#1a1919"},
+                        {label:"消費税", value:`-${fmt(purchaseDiscountRows.reduce((s,r)=>s+r.taxCredit,0))}`, color:"#5E6367"},
+                      ]} />
                     </div>
                     )}
                   </div>
@@ -9005,127 +9365,95 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
                 {/* 仕入値上げ明細 */}
                 {purchaseIncreaseRows.length > 0 && (
-                  <div style={{...DR.section,borderLeft:"2px solid #818cf844"}}>
-                    <div style={{...DR.sectionTitle,color:"#818cf8"}}>仕入値上げ</div>
+                  <div style={DR.section}>
+                    <div style={{...DR.sectionTitle,color:"#1a1919"}}>仕入値上げ</div>
                     {isMobile ? (
                       <div style={DR.cardList}>
                         {purchaseIncreaseRows.map(({h,artwork,increaseAmt,excl,taxCredit}) => (
-                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty} bg="#080818"
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="仕入先" cpName={h.counterparty} bg="#F9F9F7"
                             amounts={[
-                              {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#818cf8"},
-                              {label:"税抜金額", value:`+${fmt(excl)}`, color:"#818cf8"},
-                              {label:"消費税額", value:`+${fmt(taxCredit)}`, color:"#f59e0b"},
+                              {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#1a1919"},
+                              {label:"税抜金額", value:`+${fmt(excl)}`, color:"#1a1919"},
+                              {label:"消費税額", value:`+${fmt(taxCredit)}`, color:"#5E6367"},
                             ]}
                             onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
                         ))}
                         <div style={DR.cardFootTotal}>
                           <span style={DR.tfootLabel}>値上げ 合計</span>
-                          <span style={{...DR.tfootVal,color:"#818cf8"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</span>
+                          <span style={{...DR.tfootVal,color:"#1a1919"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</span>
                         </div>
                       </div>
                     ) : (
-                    <div style={{overflowX:"auto"}}>
-                      <table style={DR.tbl}>
-                        <thead>
-                          <tr style={DR.thead}>
-                            <th style={DR.thId}>作品ID</th>
-                            <th style={DR.thText}>仕入先</th>
-                            <th style={DR.thArtwork}>作家・作品</th>
-                            <th style={DR.thNum}>値上げ額</th>
-                            <th style={DR.thNum}>税抜金額</th>
-                            <th style={DR.thNum}>消費税額</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {purchaseIncreaseRows.map(({h,artwork,increaseAmt,excl,taxCredit,inv,creditRate},i)=>(
-                            <tr key={h.id} style={{...DR.trow,background:"#080818"}}
-                              onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
-                              <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
-                              <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <ArtworkCell artwork={artwork} />
-                              <td style={{...DR.tdNum,color:"#818cf8"}}>+{fmt(increaseAmt)}</td>
-                              <td style={{...DR.tdNum,color:"#818cf8"}}>+{fmt(excl)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>+{fmt(taxCredit)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={DR.tfoot}>
-                            <td colSpan={3} style={DR.tfootLabel}>値上げ 合計</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#818cf8"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#818cf8"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.excl,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>+{fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.taxCredit,0))}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div style={DR.txnTable}>
+                      <TxnGridHeader variant="p" cpLabel="仕入先" amount1Label="値上げ額" />
+                      {purchaseIncreaseRows.map(({h,artwork,increaseAmt,excl,taxCredit})=>(
+                        <TxnGridData key={h.id} variant="p" artwork={artwork} cpName={h.counterparty} bg="#F9F9F7"
+                          amounts={[
+                            {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#1a1919"},
+                            {label:"税抜", value:`+${fmt(excl)}`, color:"#1a1919"},
+                            {label:"消費税", value:`+${fmt(taxCredit)}`, color:"#5E6367"},
+                          ]}
+                          onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                      ))}
+                      <TxnGridFoot variant="p" label="値上げ 合計" amounts={[
+                        {label:"値上げ額", value:`+${fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}`, color:"#1a1919"},
+                        {label:"税抜", value:`+${fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.excl,0))}`, color:"#1a1919"},
+                        {label:"消費税", value:`+${fmt(purchaseIncreaseRows.reduce((s,r)=>s+r.taxCredit,0))}`, color:"#5E6367"},
+                      ]} />
                     </div>
                     )}
                   </div>
                 )}
+              </>
+              );
 
+              const salesSections = (
+              <>
                 {/* 売上明細*/}
                 {soldRows.length > 0 && (
                   <div style={DR.section}>
-                    <div style={{...DR.sectionTitle,color:"#4ade80"}}>売上</div>
+                    <div style={{...DR.sectionTitle,color:"#1a1919"}}>売上</div>
                     {isMobile ? (
                       <div style={DR.cardList}>
                         {soldRows.map(({h,artwork,price,excl,tax,costExcl,profitLoss}) => (
                           <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty}
                             amounts={[
-                              {label:"売上額", value:fmt(price), color:"#4ade80"},
+                              {label:"売上額", value:fmt(price), color:"#1a1919"},
                               {label:"税抜金額", value:fmt(excl)},
-                              {label:"消費税額", value:fmt(tax), color:"#f59e0b"},
+                              {label:"消費税額", value:fmt(tax), color:"#5E6367"},
                               {label:"原価", value:fmt(costExcl)},
-                              {label:"差損益", value:fmt(profitLoss), color:profitLoss>=0?"#a78bfa":"#f87171"},
+                              {label:"売却損益", value:fmt(profitLoss), color:"#1a1919"},
                             ]}
                             onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
                         ))}
                         <div style={DR.cardFootTotal}>
                           <span style={DR.tfootLabel}>売上 合計</span>
-                          <span style={{...DR.tfootVal,color:"#4ade80"}}>{fmt(soldRows.reduce((s,r)=>s+r.price,0))}</span>
+                          <span style={{...DR.tfootVal,color:"#1a1919"}}>{fmt(soldRows.reduce((s,r)=>s+r.price,0))}</span>
                         </div>
                       </div>
                     ) : (
-                    <div style={{overflowX:"auto"}}>
-                      <table style={DR.tblWide}>
-                        <thead>
-                          <tr style={DR.thead}>
-                            <th style={DR.thId}>作品ID</th>
-                            <th style={DR.thText}>売上先</th>
-                            <th style={DR.thArtwork}>作家・作品</th>
-                            <th style={DR.thNum}>売上額</th>
-                            <th style={DR.thNum}>税抜金額</th>
-                            <th style={DR.thNum}>消費税額</th>
-                            <th style={DR.thNum}>原価</th>
-                            <th style={DR.thNum}>差損益</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {soldRows.map(({h,artwork,price,excl,tax,costExcl,profitLoss},i)=>(
-                            <tr key={h.id} style={{...DR.trow,...(i%2===0?{}:{background:"#0d0d16"})}}
-                              onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
-                              <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
-                              <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <ArtworkCell artwork={artwork} />
-                              <td style={{...DR.tdNum,color:"#4ade80"}}>{fmt(price)}</td>
-                              <td style={DR.tdNum}>{fmt(excl)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>{fmt(tax)}</td>
-                              <td style={DR.tdNum}>{fmt(costExcl)}</td>
-                              <td style={{...DR.tdNum,color:profitLoss>=0?"#a78bfa":"#f87171",fontWeight:600}}>{fmt(profitLoss)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={DR.tfoot}>
-                            <td colSpan={3} style={DR.tfootLabel}>売上 合計</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#4ade80"}}>{fmt(soldRows.reduce((s,r)=>s+r.price,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal}}>{fmt(soldExclTotal)}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>{fmt(soldRows.reduce((s,r)=>s+r.tax,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal}}>{fmt(costExclTotal)}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:soldExclTotal-costExclTotal>=0?"#a78bfa":"#f87171"}}>{fmt(soldExclTotal-costExclTotal)}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div style={DR.txnTable}>
+                      <TxnGridHeader variant="s" cpLabel="売上先" amount1Label="売上額" />
+                      {soldRows.map(({h,artwork,price,excl,tax,costExcl,profitLoss},i)=>(
+                        <TxnGridData key={h.id} variant="s" artwork={artwork} cpName={h.counterparty}
+                          bg={i%2===0?undefined:"#F9F9F7"}
+                          amounts={[
+                            {label:"売上額", value:fmt(price), color:"#1a1919"},
+                            {label:"税抜", value:fmt(excl)},
+                            {label:"消費税", value:fmt(tax), color:"#5E6367"},
+                          ]}
+                          cost={{value:fmt(costExcl)}}
+                          profit={{value:fmt(profitLoss), color:"#1a1919"}}
+                          onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                      ))}
+                      <TxnGridFoot variant="s" label="売上 合計" amounts={[
+                        {label:"売上額", value:fmt(soldRows.reduce((s,r)=>s+r.price,0)), color:"#1a1919"},
+                        {label:"税抜", value:fmt(soldExclTotal)},
+                        {label:"消費税", value:fmt(soldRows.reduce((s,r)=>s+r.tax,0)), color:"#5E6367"},
+                      ]}
+                        cost={{value:fmt(costExclTotal)}}
+                        profit={{value:fmt(soldExclTotal-costExclTotal), color:"#1a1919"}}
+                      />
                     </div>
                     )}
                   </div>
@@ -9133,59 +9461,48 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
                 {/* 売上値引き明細 */}
                 {soldDiscountRows.length > 0 && (
-                  <div style={{...DR.section,borderLeft:"2px solid #f59e0b44"}}>
-                    <div style={{...DR.sectionTitle,color:"#f59e0b"}}>売上値引き</div>
+                  <div style={DR.section}>
+                    <div style={{...DR.sectionTitle,color:"#1a1919"}}>売上値引き</div>
                     {isMobile ? (
                       <div style={DR.cardList}>
-                        {soldDiscountRows.map(({h,artwork,discountAmt,excl,tax}) => (
-                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty} bg="#0f0a00"
+                        {soldDiscountRows.map(({h,artwork,discountAmt,excl,tax,costExcl}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty} bg="#F9F9F7"
                             amounts={[
-                              {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#f59e0b"},
-                              {label:"税抜金額", value:`-${fmt(excl)}`, color:"#f59e0b"},
-                              {label:"消費税額", value:`-${fmt(tax)}`, color:"#f59e0b"},
+                              {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#1a1919"},
+                              {label:"税抜金額", value:`-${fmt(excl)}`, color:"#1a1919"},
+                              {label:"消費税額", value:`-${fmt(tax)}`, color:"#5E6367"},
+                              {label:"原価", value:fmt(costExcl), color:"#5E6367"},
+                              {label:"売却損益", value:`-${fmt(excl)}`, color:"#1a1919"},
                             ]}
                             onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
                         ))}
                         <div style={DR.cardFootTotal}>
                           <span style={DR.tfootLabel}>値引き 合計</span>
-                          <span style={{...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountTotal)}</span>
+                          <span style={{...DR.tfootVal,color:"#1a1919"}}>-{fmt(soldDiscountTotal)}</span>
                         </div>
                       </div>
                     ) : (
-                    <div style={{overflowX:"auto"}}>
-                      <table style={DR.tbl}>
-                        <thead>
-                          <tr style={DR.thead}>
-                            <th style={DR.thId}>作品ID</th>
-                            <th style={DR.thText}>売上先</th>
-                            <th style={DR.thArtwork}>作家・作品</th>
-                            <th style={DR.thNum}>値引き額</th>
-                            <th style={DR.thNum}>税抜金額</th>
-                            <th style={DR.thNum}>消費税額</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {soldDiscountRows.map(({h,artwork,discountAmt,excl,tax},i)=>(
-                            <tr key={h.id} style={{...DR.trow,background:"#0f0a00"}}
-                              onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
-                              <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
-                              <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <ArtworkCell artwork={artwork} />
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(discountAmt)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(excl)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>-{fmt(tax)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={DR.tfoot}>
-                            <td colSpan={3} style={DR.tfootLabel}>値引き 合計</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountTotal)}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountRows.reduce((s,r)=>s+r.excl,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>-{fmt(soldDiscountRows.reduce((s,r)=>s+r.tax,0))}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div style={DR.txnTable}>
+                      <TxnGridHeader variant="s" cpLabel="売上先" amount1Label="値引き額" />
+                      {soldDiscountRows.map(({h,artwork,discountAmt,excl,tax,costExcl,profitLoss})=>(
+                        <TxnGridData key={h.id} variant="s" artwork={artwork} cpName={h.counterparty} bg="#F9F9F7"
+                          amounts={[
+                            {label:"値引き額", value:`-${fmt(discountAmt)}`, color:"#1a1919"},
+                            {label:"税抜", value:`-${fmt(excl)}`, color:"#1a1919"},
+                            {label:"消費税", value:`-${fmt(tax)}`, color:"#5E6367"},
+                          ]}
+                          cost={{value:fmt(costExcl)}}
+                          profit={{value:`-${fmt(excl)}`, color:"#1a1919"}}
+                          onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                      ))}
+                      <TxnGridFoot variant="s" label="値引き 合計" amounts={[
+                        {label:"値引き額", value:`-${fmt(soldDiscountTotal)}`, color:"#1a1919"},
+                        {label:"税抜", value:`-${fmt(soldDiscountRows.reduce((s,r)=>s+r.excl,0))}`, color:"#1a1919"},
+                        {label:"消費税", value:`-${fmt(soldDiscountRows.reduce((s,r)=>s+r.tax,0))}`, color:"#5E6367"},
+                      ]}
+                        cost={{value:fmt(soldDiscountRows.reduce((s,r)=>s+r.costExcl,0))}}
+                        profit={{value:`-${fmt(soldDiscountRows.reduce((s,r)=>s+r.excl,0))}`, color:"#1a1919"}}
+                      />
                     </div>
                     )}
                   </div>
@@ -9193,66 +9510,68 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
                 {/* 売上値上げ明細 */}
                 {soldIncreaseRows.length > 0 && (
-                  <div style={{...DR.section,borderLeft:"2px solid #34d39944"}}>
-                    <div style={{...DR.sectionTitle,color:"#34d399"}}>売上値上げ</div>
+                  <div style={DR.section}>
+                    <div style={{...DR.sectionTitle,color:"#1a1919"}}>売上値上げ</div>
                     {isMobile ? (
                       <div style={DR.cardList}>
-                        {soldIncreaseRows.map(({h,artwork,increaseAmt,excl,tax}) => (
-                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty} bg="#001a0a"
+                        {soldIncreaseRows.map(({h,artwork,increaseAmt,excl,tax,costExcl}) => (
+                          <MobileTxnCard key={h.id} artwork={artwork} cpLabel="売上先" cpName={h.counterparty} bg="#F9F9F7"
                             amounts={[
-                              {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#34d399"},
-                              {label:"税抜金額", value:`+${fmt(excl)}`, color:"#34d399"},
-                              {label:"消費税額", value:`+${fmt(tax)}`, color:"#f59e0b"},
+                              {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#1a1919"},
+                              {label:"税抜金額", value:`+${fmt(excl)}`, color:"#1a1919"},
+                              {label:"消費税額", value:`+${fmt(tax)}`, color:"#5E6367"},
+                              {label:"原価", value:fmt(costExcl), color:"#5E6367"},
+                              {label:"売却損益", value:`+${fmt(excl)}`, color:"#1a1919"},
                             ]}
                             onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
                         ))}
                         <div style={DR.cardFootTotal}>
                           <span style={DR.tfootLabel}>値上げ 合計</span>
-                          <span style={{...DR.tfootVal,color:"#34d399"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</span>
+                          <span style={{...DR.tfootVal,color:"#1a1919"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</span>
                         </div>
                       </div>
                     ) : (
-                    <div style={{overflowX:"auto"}}>
-                      <table style={DR.tbl}>
-                        <thead>
-                          <tr style={DR.thead}>
-                            <th style={DR.thId}>作品ID</th>
-                            <th style={DR.thText}>売上先</th>
-                            <th style={DR.thArtwork}>作家・作品</th>
-                            <th style={DR.thNum}>値上げ額</th>
-                            <th style={DR.thNum}>税抜金額</th>
-                            <th style={DR.thNum}>消費税額</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {soldIncreaseRows.map(({h,artwork,increaseAmt,excl,tax},i)=>(
-                            <tr key={h.id} style={{...DR.trow,background:"#001a0a"}}
-                              onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)}>
-                              <td style={DR.tdId}>{artwork?.artwork_id||"—"}</td>
-                              <td style={DR.tdText}>{h.counterparty||"—"}</td>
-                              <ArtworkCell artwork={artwork} />
-                              <td style={{...DR.tdNum,color:"#34d399"}}>+{fmt(increaseAmt)}</td>
-                              <td style={{...DR.tdNum,color:"#34d399"}}>+{fmt(excl)}</td>
-                              <td style={{...DR.tdNum,color:"#f59e0b"}}>+{fmt(tax)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr style={DR.tfoot}>
-                            <td colSpan={3} style={DR.tfootLabel}>値上げ 合計</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#34d399"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#34d399"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.excl,0))}</td>
-                            <td style={{...DR.tdNum,...DR.tfootVal,color:"#f59e0b"}}>+{fmt(soldIncreaseRows.reduce((s,r)=>s+r.tax,0))}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div style={DR.txnTable}>
+                      <TxnGridHeader variant="s" cpLabel="売上先" amount1Label="値上げ額" />
+                      {soldIncreaseRows.map(({h,artwork,increaseAmt,excl,tax,costExcl})=>(
+                        <TxnGridData key={h.id} variant="s" artwork={artwork} cpName={h.counterparty} bg="#F9F9F7"
+                          amounts={[
+                            {label:"値上げ額", value:`+${fmt(increaseAmt)}`, color:"#1a1919"},
+                            {label:"税抜", value:`+${fmt(excl)}`, color:"#1a1919"},
+                            {label:"消費税", value:`+${fmt(tax)}`, color:"#5E6367"},
+                          ]}
+                          cost={{value:fmt(costExcl)}}
+                          profit={{value:`+${fmt(excl)}`, color:"#1a1919"}}
+                          onClick={()=>artwork&&onSelectArtwork(artwork.artwork_id)} />
+                      ))}
+                      <TxnGridFoot variant="s" label="値上げ 合計" amounts={[
+                        {label:"値上げ額", value:`+${fmt(soldIncreaseRows.reduce((s,r)=>s+r.increaseAmt,0))}`, color:"#1a1919"},
+                        {label:"税抜", value:`+${fmt(soldIncreaseRows.reduce((s,r)=>s+r.excl,0))}`, color:"#1a1919"},
+                        {label:"消費税", value:`+${fmt(soldIncreaseRows.reduce((s,r)=>s+r.tax,0))}`, color:"#5E6367"},
+                      ]}
+                        cost={{value:fmt(soldIncreaseRows.reduce((s,r)=>s+r.costExcl,0))}}
+                        profit={{value:`+${fmt(soldIncreaseRows.reduce((s,r)=>s+r.excl,0))}`, color:"#1a1919"}}
+                      />
                     </div>
                     )}
                   </div>
                 )}
+              </>
+              );
 
-              </div>
-            )}
+              return (
+                <div style={DR.detail}>
+                  {isMobile ? (
+                    <>{purchaseSections}{salesSections}</>
+                  ) : (
+                    <div style={DR.detailCols}>
+                      <div style={DR.detailColLeft}>{purchaseSections}</div>
+                      <div style={DR.detailCol}>{salesSections}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })}
@@ -9265,60 +9584,114 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
 
 const DR = {
-  dayBlock:      { borderBottom:"1px solid #1e1e30" },
-  dayHeader:     { padding:"14px 10px", cursor:"pointer", transition:"background 0.15s" },
+  dayBlock:      { borderBottom:"1px solid #C6C6C8" },
+  dayHeader:     { padding:"14px 10px", cursor:"pointer", transition:"background 0.15s", background:"#F9F9F7" },
   dayDateRow:    { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 },
-  dayDate:       { fontSize:15, fontFamily:"sans-serif", letterSpacing:"0.05em" },
-  expandIcon:    { fontSize:10, color:"#aaa" },
-  summaryGrid:   { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 },
+  dayDate:       { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em" },
+  expandIcon:    { fontSize:10, color:"#5E6367" },
+  summaryGrid:   { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16 },
   summaryCell:   { display:"flex", flexDirection:"column", gap:3 },
-  summaryLabel:  { fontSize:10, color:"#aaa", fontFamily:"sans-serif" },
-  summaryVal:    { fontSize:15, fontFamily:"sans-serif", fontWeight:600 },
+  summaryLabel:  { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  summaryVal:    { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:700 },
   detail:        { padding:"0 6px 14px", display:"flex", flexDirection:"column", gap:10 },
-  section:       { background:"#0a0a14", borderRadius:8, padding:"10px 10px" },
-  sectionTitle:  { fontSize:12, fontFamily:"sans-serif", letterSpacing:"0.08em", marginBottom:8, fontWeight:600 },
-  tbl:           { width:"auto", borderCollapse:"collapse", minWidth:560, fontSize:12, fontFamily:"sans-serif" },
-  tblWide:       { width:"auto", borderCollapse:"collapse", minWidth:680, fontSize:12, fontFamily:"sans-serif" },
-  thead:         { borderBottom:"1px solid #2a2a40" },
-  thId:          { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#aaa", whiteSpace:"nowrap", width:72 },
-  thText:        { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#aaa", whiteSpace:"nowrap" },
-  thArtwork:     { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#aaa", whiteSpace:"nowrap", minWidth:160 },
-  thNum:         { padding:"4px 6px", textAlign:"right", fontSize:10, color:"#aaa", whiteSpace:"nowrap" },
-  trow:          { borderBottom:"1px solid #13131e", cursor:"pointer", transition:"background 0.1s" },
-  tdId:          { padding:"7px 6px", fontFamily:"'Courier New',monospace", fontSize:12, color:"#a78bfa", fontWeight:700, whiteSpace:"nowrap", verticalAlign:"top" },
-  tdText:        { padding:"7px 6px", fontSize:12, color:"#ccc", whiteSpace:"nowrap", verticalAlign:"top", maxWidth:120, overflow:"hidden", textOverflow:"ellipsis" },
-  tdTitle:       { padding:"7px 6px", fontSize:12, color:"#e2e0f0", fontWeight:600, whiteSpace:"nowrap", verticalAlign:"top", maxWidth:140, overflow:"hidden", textOverflow:"ellipsis" },
+  detailCols:    { display:"flex", flexDirection:"column", gap:16 },
+  detailCol:     { display:"flex", flexDirection:"column", gap:10, width:"100%" },
+  detailColLeft: { display:"flex", flexDirection:"column", gap:10, width:"100%" },
+  section:       { background:"#F9F9F7", border:"1px solid #ece9e2", borderRadius:8, padding:"10px 10px" },
+  sectionTitle:  { fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.08em", marginBottom:8, fontWeight:600 },
+  txnGridHeader: { borderBottom:"1px solid #C6C6C8", marginBottom:2 },
+  hCp:           { gridColumn:1, gridRow:1, fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", minWidth:0, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" },
+  hInfo:         { gridColumn:2, gridRow:1, fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", minWidth:0, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" },
+  hAmt1:         { gridColumn:3, gridRow:1, textAlign:"right", fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", minWidth:0, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" },
+  hCostProfit:   { gridColumn:4, gridRow:1, textAlign:"right", fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", minWidth:0, overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" },
+  tbl:           { width:"auto", borderCollapse:"collapse", minWidth:560, fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  tblWide:       { width:"auto", borderCollapse:"collapse", minWidth:680, fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  thead:         { borderBottom:"1px solid #C6C6C8" },
+  thId:          { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#5E6367", whiteSpace:"nowrap", width:72 },
+  thText:        { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#5E6367", whiteSpace:"nowrap" },
+  thArtwork:     { padding:"4px 6px", textAlign:"left", fontSize:10, color:"#5E6367", whiteSpace:"nowrap", minWidth:160 },
+  thNum:         { padding:"4px 6px", textAlign:"right", fontSize:10, color:"#5E6367", whiteSpace:"nowrap" },
+  trow:          { borderBottom:"1px solid #C6C6C8", cursor:"pointer", transition:"background 0.1s" },
+  tdId:          { padding:"7px 6px", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:12, color:"#1a1919", fontWeight:700, whiteSpace:"nowrap", verticalAlign:"top" },
+  tdText:        { padding:"7px 6px", fontSize:12, color:"#5E6367", whiteSpace:"nowrap", verticalAlign:"top", maxWidth:120, overflow:"hidden", textOverflow:"ellipsis" },
+  tdTitle:       { padding:"7px 6px", fontSize:12, color:"#1a1919", fontWeight:600, whiteSpace:"nowrap", verticalAlign:"top", maxWidth:140, overflow:"hidden", textOverflow:"ellipsis" },
   tdArtwork:     { padding:"7px 6px", fontSize:12, verticalAlign:"top", maxWidth:260 },
-  tdArtworkArtist:{ color:"#999", fontSize:11, marginBottom:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
-  tdArtworkTitle: { color:"#e2e0f0", fontWeight:600, fontSize:12, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
-  tdArtworkSize:  { color:"#777", fontSize:10.5, marginTop:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
-  tdNum:         { padding:"7px 6px", textAlign:"right", fontFamily:"sans-serif", fontSize:13, whiteSpace:"nowrap", verticalAlign:"top" },
-  tfoot:         { borderTop:"2px solid #2a2a40", background:"#0f0f18" },
-  tfootLabel:    { padding:"6px 6px", fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  tfootVal:      { fontFamily:"sans-serif", fontSize:14, fontWeight:700 },
-  fiscalHeader:  { background:"#13131e", border:"1px solid #a78bfa33", borderRadius:10, padding:"14px 14px", margin:"16px 0 0", position:"sticky", top:0, zIndex:10 },
-  fiscalTitle:   { fontSize:12, color:"#a78bfa", fontFamily:"sans-serif", letterSpacing:"0.08em", marginBottom:10, fontWeight:600 },
-  fiscalSummary: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 },
+  tdArtworkArtist:{ color:"#5E6367", fontSize:11, marginBottom:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
+  tdArtworkTitle: { color:"#1a1919", fontWeight:600, fontSize:12, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
+  tdArtworkSize:  { color:"#5E6367", fontSize:10.5, marginTop:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
+  tdNum:         { padding:"7px 6px", textAlign:"right", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:13, whiteSpace:"nowrap", verticalAlign:"top" },
+  tfoot:         { borderTop:"2px solid #C6C6C8", background:"#F9F9F7" },
+  tfootLabel:    { padding:"6px 6px", fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  tfootVal:      { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, fontWeight:700 },
+  fiscalHeader:  { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:10, padding:"14px 14px", margin:"16px 0 0", position:"sticky", top:0, zIndex:10 },
+  fiscalTitle:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.08em", marginBottom:10, fontWeight:600 },
+  fiscalSummary: { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16 },
   fiscalCell:    { display:"flex", flexDirection:"column", gap:3 },
-  fiscalLabel:   { fontSize:10, color:"#aaa", fontFamily:"sans-serif" },
-  fiscalVal:     { fontSize:16, fontFamily:"sans-serif", fontWeight:700 },
-  invoiceBadge:  { fontSize:9, background:"#4ade8022", color:"#4ade80", border:"1px solid #4ade8044", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
+  fiscalLabel:   { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  fiscalVal:     { fontSize:16, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:700 },
+  invoiceBadge:  { fontSize:9, background:"#22c55e22", color:"#22c55e", border:"1px solid #22c55e44", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
   noInvoiceBadge:{ fontSize:9, background:"#f8717122", color:"#f87171", border:"1px solid #f8717144", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
+
+  // ── PC：flex行（取引情報を左、金額情報を右に両端配置） ──
+  txnTable:      { display:"flex", flexDirection:"column", width:"100%" },
+
+  // ── PC：4行ミニグリッド（作品ID/作家名/タイトル/サイズを縦積み、金額を該当行に配置） ──
+  // 列構成（仕入系=3列 / 売上系=5列）。列幅は固定し、どの行でも金額の開始位置が揃う。
+  // 各列を画面幅に応じて比例配分（minmaxの下限は読みやすさを保つための最低幅）
+  // 仕入先/売上先20%・作品情報30%・仕入額/売上額25%・原価／売却損益25%（比率4:6:5:5）
+  // 純粋な比率のみ（下限なし）なので箱の幅にかかわらず必ず端まで埋まる
+  // 仕入・売上で同じ列幅の型を共有：仕入は列4（原価／売却損益）を使わないため、
+  // 仕入・売上を縦に並べても列の境界が揃い、仕入の右側は自然に空白になる
+  txnGridCols:   { gridTemplateColumns:"4fr 6fr 5fr 5fr", columnGap:10 },
+  txnGridRow:    { display:"grid", width:"100%", gridTemplateRows:"repeat(4, auto)", columnGap:10, rowGap:0, alignItems:"center", padding:"5px 8px" },
+  txnGridHead:   { borderBottom:"1px solid #C6C6C8" },
+  txnGridData:   { borderBottom:"1px solid #C6C6C8", cursor:"pointer", transition:"background 0.1s" },
+  txnGridFoot:   { borderTop:"2px solid #C6C6C8", background:"#F9F9F7" },
+
+  gCounterparty: { gridColumn:1, gridRow:"1 / span 4", alignSelf:"center", minWidth:0, overflow:"hidden" },
+  gId:           { gridColumn:2, gridRow:1, minWidth:0, overflow:"hidden" },
+  gArtist:       { gridColumn:2, gridRow:2, minWidth:0, overflow:"hidden" },
+  gTitle:        { gridColumn:2, gridRow:3, minWidth:0, overflow:"hidden" },
+  gSize:         { gridColumn:2, gridRow:4, minWidth:0, overflow:"hidden" },
+  gAmount1:      { gridColumn:3, gridRow:1, textAlign:"right", minWidth:0 },
+  gAmount2:      { gridColumn:3, gridRow:3, textAlign:"right", minWidth:0 },
+  gAmount3:      { gridColumn:3, gridRow:4, textAlign:"right", minWidth:0 },
+  gCostProfit:   { gridColumn:4, gridRow:"1 / span 4", alignSelf:"center", display:"flex", flexDirection:"column", alignItems:"flex-end", gap:2, width:"100%" },
+
+  gHeadLabel:    { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap" },
+  gHeadLabelR:   { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap", display:"block" },
+  gCpName:       { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"normal", wordBreak:"break-word", lineHeight:1.4 },
+  gIdVal:        { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:12, color:"#1a1919", fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", display:"block" },
+  gTextVal:      { fontSize:11, color:"#5E6367", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", display:"block" },
+  gTitleVal:     { fontSize:12, color:"#1a1919", fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", display:"block" },
+  gSizeVal:      { fontSize:10.5, color:"#5E6367", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", display:"block" },
+  gAmountLabel:  { fontSize:9.5, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap", display:"block", marginBottom:1 },
+  gAmountMain:   { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, fontWeight:700, whiteSpace:"nowrap", display:"block" },
+  gAmountSub:    { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:12, whiteSpace:"nowrap", display:"block" },
+  gAmountTax:    { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:11, whiteSpace:"nowrap", display:"block" },
+  gAmountVal:    { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:13, whiteSpace:"nowrap" },
+  // 横並びラベル付き金額行（ラベル 数値）
+  gAmountRow:    { display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:6, whiteSpace:"nowrap" },
+  gAmountRowLabel:{ fontSize:9.5, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0 },
+  gAmountRowSub: { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:12, whiteSpace:"nowrap" },
+  gAmountRowTax: { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:11, whiteSpace:"nowrap" },
+  gFootLabel:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap" },
+  gFootVal:      { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, fontWeight:700, whiteSpace:"nowrap" },
 
   // ── スマホ：カード型行 ──
   cardList:      { display:"flex", flexDirection:"column", gap:8 },
   card:          { borderRadius:8, padding:"10px 12px", cursor:"pointer" },
   cardTopRow:    { display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 },
-  cardId:        { fontFamily:"'Courier New',monospace", fontSize:12, color:"#a78bfa", fontWeight:700 },
-  cardCp:        { fontSize:11, color:"#999", textAlign:"right" },
-  cardArtist:    { fontSize:11, color:"#999", marginBottom:1 },
-  cardTitle:     { fontSize:13, color:"#e2e0f0", fontWeight:600, marginBottom:1 },
-  cardSize:      { fontSize:10.5, color:"#777", marginBottom:8 },
-  cardAmountRow: { display:"flex", flexWrap:"wrap", gap:"4px 14px", borderTop:"1px solid #1e1e3088", paddingTop:6 },
+  cardId:        { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:12, color:"#1a1919", fontWeight:700 },
+  cardCp:        { fontSize:11, color:"#5E6367", textAlign:"right" },
+  cardArtist:    { fontSize:11, color:"#5E6367", marginBottom:1 },
+  cardTitle:     { fontSize:13, color:"#1a1919", fontWeight:700, marginBottom:1 },
+  cardSize:      { fontSize:10.5, color:"#5E6367", marginBottom:8 },
+  cardAmountRow: { display:"flex", flexWrap:"wrap", gap:"4px 14px", borderTop:"1px solid #C6C6C888", paddingTop:6 },
   cardAmountCell:{ display:"flex", flexDirection:"column", gap:1, minWidth:72 },
-  cardAmountLabel:{ fontSize:9.5, color:"#888" },
-  cardAmountVal: { fontSize:13, fontFamily:"sans-serif", fontWeight:600 },
-  cardFootTotal: { display:"flex", justifyContent:"space-between", padding:"8px 12px", marginTop:2, borderRadius:8, background:"#0f0f18", border:"1px solid #2a2a40" },
+  cardAmountLabel:{ fontSize:9.5, color:"#5E6367" },
+  cardAmountVal: { fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:600 },
+  cardFootTotal: { display:"flex", justifyContent:"space-between", padding:"8px 12px", marginTop:2, borderRadius:8, background:"#F9F9F7", border:"1px solid #C6C6C8" },
 };
 
 
@@ -9326,7 +9699,7 @@ const DR = {
 function TxBlock({ color, title, children }) {
   return (
     <div style={{ marginBottom:12, borderLeft:`3px solid ${color}55`, paddingLeft:10 }}>
-      <div style={{ fontSize:10, letterSpacing:"0.08em", color, fontFamily:"sans-serif", fontWeight:600, marginBottom:6 }}>
+      <div style={{ fontSize:10, letterSpacing:"0.08em", color, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:600, marginBottom:6 }}>
         {title}
       </div>
       {children}
@@ -9338,10 +9711,75 @@ function TxRow({ label, val, color, large }) {
   if (val == null || val === "" || val === "—") return null;
   return (
     <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:4 }}>
-      <span style={{ fontSize:11, color:"#666", fontFamily:"sans-serif", flexShrink:0, minWidth:72 }}>{label}</span>
-      <span style={{ fontSize: large ? 15 : 13, fontFamily:"sans-serif", color: color||"#ccc", fontWeight: large ? 600 : 400 }}>
+      <span style={{ fontSize:11, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0, minWidth:72 }}>{label}</span>
+      <span style={{ fontSize: large ? 15 : 13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", color: color||"#5E6367", fontWeight: large ? 600 : 400 }}>
         {val}
       </span>
+    </div>
+  );
+}
+
+// 年・月・日を分割入力する日付コンポーネント
+// Safari等でtype="date"の年に6桁まで入力できてしまう問題を回避するため、
+// 年(4桁)・月(2桁)・日(2桁)を独立した入力欄にし、桁数を物理的に制限する。
+// あわせて「4月31日」のような実在しない日付をリアルタイムで検知し、赤枠＋メッセージで知らせる
+// （自動補正はしない＝入力者が気づかないうちに値が変わることを避けるため）。
+function SplitDateInput({ value, onChange, compact }) {
+  const parse = (v) => {
+    const mch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v || "");
+    return mch ? { y: mch[1], mo: String(Number(mch[2])), d: String(Number(mch[3])) } : { y: "", mo: "", d: "" };
+  };
+  const [y, setY]   = useState(() => parse(value).y);
+  const [mo, setMo] = useState(() => parse(value).mo);
+  const [d, setD]   = useState(() => parse(value).d);
+  const lastEmitted = useRef(value || "");
+
+  useEffect(() => {
+    if (value !== lastEmitted.current) {
+      const p = parse(value);
+      setY(p.y); setMo(p.mo); setD(p.d);
+      lastEmitted.current = value || "";
+    }
+  }, [value]);
+
+  const mRef = useRef<HTMLInputElement>(null);
+  const dRef = useRef<HTMLInputElement>(null);
+  const pad2 = (n) => String(n).padStart(2, "0");
+
+  const emit = (ny, nmo, nd) => {
+    const composed = (ny.length === 4 && nmo !== "" && nd !== "") ? `${ny}-${pad2(nmo)}-${pad2(nd)}` : "";
+    lastEmitted.current = composed;
+    onChange(composed);
+  };
+  const onY  = (e) => { const v=e.target.value.replace(/[^0-9]/g,"").slice(0,4); setY(v);  emit(v,mo,d); if(v.length===4) mRef.current?.focus(); };
+  const onMo = (e) => { const v=e.target.value.replace(/[^0-9]/g,"").slice(0,2); setMo(v); emit(y,v,d);  if(v.length===2) dRef.current?.focus(); };
+  const onD  = (e) => { const v=e.target.value.replace(/[^0-9]/g,"").slice(0,2); setD(v);  emit(y,mo,v); };
+
+  let errorMsg = "";
+  if (y.length===4 && mo!=="" && d!=="") {
+    const yi=Number(y), moi=Number(mo), di=Number(d);
+    if (moi<1||moi>12) errorMsg = "月は1〜12で入力してください";
+    else { const dim=daysInMonthOf(yi,moi); if(di<1||di>dim) errorMsg = `${moi}月は${dim}日までです`; }
+  }
+
+  const box = { ...S.formInput, textAlign:"center" as const,
+    padding: compact ? "6px 4px" : "9px 6px", fontSize: compact ? 12 : 13 };
+  const wy = compact?46:60, wmd = compact?28:40;
+  const errStyle = errorMsg ? { borderColor:"#f87171" } : {};
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:4}}>
+        <input inputMode="numeric" placeholder="年" value={y} onChange={onY}
+          style={{...box,...errStyle,width:wy,flex:"none"}}/>
+        <span style={{color:"#5E6367"}}>/</span>
+        <input inputMode="numeric" placeholder="月" value={mo} onChange={onMo} ref={mRef}
+          style={{...box,...errStyle,width:wmd,flex:"none"}}/>
+        <span style={{color:"#5E6367"}}>/</span>
+        <input inputMode="numeric" placeholder="日" value={d} onChange={onD} ref={dRef}
+          style={{...box,...errStyle,width:wmd,flex:"none"}}/>
+      </div>
+      {errorMsg && <div style={{fontSize:11,color:"#f87171",marginTop:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>{errorMsg}</div>}
     </div>
   );
 }
@@ -9385,10 +9823,10 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
           value={value} onChange={e => { onChange(e.target.value, null); setCursor(-1); }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKey} />
-        <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#a78bfa",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
+        <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
           onClick={() => setOpen(o => !o)}>▾</button>
       </div>
-      {cpId && <div style={{ fontSize:11, color:"#a78bfa", marginTop:2 }}>✓ 取引先DBと連携済み</div>}
+      {cpId && <div style={{ fontSize:11, color:"#5A57A6", marginTop:2 }}>✓ 取引先DBと連携済み</div>}
       {open && (
         <div style={S.cpDropdown}>
           <input style={{ ...S.formInput, margin:"8px 8px 4px", width:"calc(100% - 16px)", fontSize:12, boxSizing:"border-box" }}
@@ -9397,12 +9835,12 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
             onKeyDown={handleKey} autoFocus />
           <div ref={listRef} style={{ maxHeight:160, overflowY:"auto" }}>
             {filtered.map((cp,i) => (
-              <div key={cp.id} style={{...S.cpDropdownItem,...(cursor===i?{background:"#1e1e30"}:{})}}
+              <div key={cp.id} style={{...S.cpDropdownItem,...(cursor===i?{background:"#efeeeb"}:{})}}
                 onClick={() => select(cp)}
                 onMouseEnter={()=>setCursor(i)}
                 onMouseLeave={()=>{}}>
                 <span style={{ fontWeight:600 }}>{cpDisplayName(cp)}</span>
-                {cp.name_kana&&<span style={{fontSize:11,color:"#aaa",marginLeft:6}}>{cp.name_kana}</span>}
+                {cp.name_kana&&<span style={{fontSize:11,color:"#5E6367",marginLeft:6}}>{cp.name_kana}</span>}
               </div>
             ))}
           </div>
@@ -9415,143 +9853,142 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
 
 // ─── グローバルスタイル ─────────────────────────────────────────
 const S = {
-  root:        { display:"flex", height:"100vh", background:"#0a0a0f", color:"#e2e0f0", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", overflow:"hidden" },
-  sidebar:     { width:220, flexShrink:0, background:"#0f0f18", borderRight:"1px solid #1e1e30", display:"flex", flexDirection:"column", padding:"28px 16px", gap:8 },
-  logo:        { display:"flex", alignItems:"center", gap:10, marginBottom:28, paddingBottom:20, borderBottom:"1px solid #1e1e30" },
-  logoMark:    { fontSize:28, color:"#a78bfa" },
+  root:        { display:"flex", height:"100vh", background:"#F9F9F7", color:"#1a1919", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", overflow:"hidden" },
+  sidebar:     { width:220, flexShrink:0, background:"#F9F9F7", borderRight:"1px solid #C6C6C8", display:"flex", flexDirection:"column", padding:"28px 16px", gap:8 },
+  logo:        { display:"flex", alignItems:"center", gap:10, marginBottom:28, paddingBottom:20, borderBottom:"1px solid #C6C6C8" },
+  logoMark:    { fontSize:28, color:"#5A57A6" },
   logoTitle:   { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:18, fontWeight:700, letterSpacing:"0.2em" },
-  logoSub:     { fontSize:9, letterSpacing:"0.1em", color:"#555", fontFamily:"sans-serif" },
+  logoSub:     { fontSize:9, letterSpacing:"0.1em", color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   nav:         { display:"flex", flexDirection:"column", gap:4 },
-  navItem:     { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:8, border:"none", background:"transparent", color:"#888", cursor:"pointer", fontSize:13, fontFamily:"sans-serif", transition:"background 0.15s, color 0.15s", textAlign:"left" },
-  navActive:   { background:"#1e1e30", color:"#e2e0f0" },
-  navAdd:      { marginTop:0, background:"#1a1030", color:"#a78bfa", border:"1px solid #a78bfa33" },
-  navAdd2:     { background:"#0a1a20", color:"#38bdf8", border:"1px solid #38bdf833" },
-  navDivider:  { height:1, background:"#1e1e30", margin:"8px 0" },
+  navItem:     { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:8, border:"none", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", transition:"background 0.15s, color 0.15s", textAlign:"left" },
+  navActive:   { background:"#C6C6C8", color:"#1a1919" },
+  navAdd:      { marginTop:0, background:"#F9F9F7", color:"#1a1919", border:"1px solid #C6C6C8" },
+  navAdd2:     { background:"#F9F9F7", color:"#1a1919", border:"1px solid #C6C6C8" },
+  navDivider:  { height:1, background:"#C6C6C8", margin:"8px 0" },
   navIcon:     { fontSize:16 },
-  sideStats:   { marginTop:"auto", display:"flex", flexDirection:"column", gap:10, padding:"14px 12px", background:"#0a0a14", borderRadius:10, border:"1px solid #1e1e30" },
+  sideStats:   { marginTop:"auto", display:"flex", flexDirection:"column", gap:10, padding:"14px 12px", background:"#F9F9F7", borderRadius:10, border:"1px solid #C6C6C8" },
   statItem:    { display:"flex", justifyContent:"space-between", alignItems:"center" },
-  statNum:     { fontSize:20, fontWeight:700, fontFamily:"sans-serif" },
-  statLab:     { fontSize:11, color:"#666", fontFamily:"sans-serif" },
-  main:        { flex:1, overflow:"auto", background:"#0a0a0f" },
+  statNum:     { fontSize:20, fontWeight:700, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  statLab:     { fontSize:11, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  main:        { flex:1, overflow:"auto", background:"#F9F9F7" },
   content:     { padding:"24px 16px 70px" },
-  contentPc:   { padding:"36px 40px" },
+  contentPc:   { padding:"36px 40px", maxWidth:800, margin:"0 auto", boxSizing:"border-box" },
   pageHeader:  { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 },
   pageTitle:   { fontSize:26, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em", fontWeight:600, margin:0 },
   toolbar:     { display:"flex", gap:10, marginBottom:16, alignItems:"center", flexWrap:"wrap" },
-  search:      { flex:1, minWidth:180, background:"#0f0f18", border:"1px solid #2a2a40", borderRadius:8, padding:"8px 14px", color:"#e2e0f0", fontSize:13, fontFamily:"sans-serif", outline:"none" },
-  searchBar:   { background:"#0f0f18", border:"1px solid #2a2a40", borderRadius:8, padding:"8px 14px", color:"#e2e0f0", fontSize:13, fontFamily:"sans-serif", outline:"none", width:"100%", boxSizing:"border-box", marginBottom:10 },
+  search:      { flex:1, minWidth:180, background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 14px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none" },
+  searchBar:   { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 14px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", width:"100%", boxSizing:"border-box", marginBottom:10 },
   filterGroup: { display:"flex", gap:6, flexWrap:"wrap" },
-  filterBtn:   { padding:"6px 12px", borderRadius:20, border:"1px solid #2a2a40", background:"transparent", color:"#888", cursor:"pointer", fontSize:12, fontFamily:"sans-serif" },
-  filterActive:{ background:"#1e1e30", color:"#e2e0f0", borderColor:"#a78bfa44" },
-  filter:      { padding:"6px 12px", borderRadius:20, border:"1px solid #2a2a40", background:"transparent", color:"#888", cursor:"pointer", fontSize:12, fontFamily:"sans-serif" },
+  filterBtn:   { padding:"6px 12px", borderRadius:20, border:"1px solid #C6C6C8", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  filterActive:{ background:"#081319", color:"#fff", borderColor:"#081319" },
+  filter:      { padding:"6px 12px", borderRadius:20, border:"1px solid #C6C6C8", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   tableOuter:  { overflowX:"auto" },
   tableWrap:   { overflowX:"auto" },
   table:       { width:"100%", borderCollapse:"collapse", minWidth:900 },
-  th:          { textAlign:"left", padding:"10px 12px", fontSize:12, color:"#aaa", fontFamily:"sans-serif", letterSpacing:"0.05em", borderBottom:"1px solid #1e1e30", whiteSpace:"nowrap" },
+  th:          { textAlign:"left", padding:"10px 12px", fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em", borderBottom:"1px solid #C6C6C8", whiteSpace:"nowrap" },
   tr:          { cursor:"pointer", transition:"background 0.15s" },
-  td:          { padding:"13px 12px", fontSize:13, fontFamily:"sans-serif", borderBottom:"1px solid #13131e", color:"#ccc", whiteSpace:"nowrap" },
-  price:       { fontFamily:"sans-serif", fontSize:14, color:"#e2e0f0" },
-  statusBadge: { padding:"3px 9px", borderRadius:20, fontSize:12, fontFamily:"sans-serif" },
-  arrowBtn:    { color:"#555", fontSize:14 },
-  empty:       { textAlign:"center", color:"#aaa", padding:"60px 0", fontFamily:"sans-serif", fontSize:13 },
-  backBtn:     { background:"none", border:"none", color:"#a78bfa", cursor:"pointer", fontSize:13, fontFamily:"sans-serif", marginBottom:20, padding:0 },
+  td:          { padding:"13px 12px", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", borderBottom:"1px solid #C6C6C8", color:"#5E6367", whiteSpace:"nowrap", verticalAlign:"top" },
+  price:       { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, color:"#1a1919" },
+  statusBadge: { padding:"3px 9px", borderRadius:20, fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  arrowBtn:    { color:"#5E6367", fontSize:14 },
+  empty:       { textAlign:"center", color:"#5E6367", padding:"60px 0", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:13 },
+  backBtn:     { background:"none", border:"none", color:"#5E6367", cursor:"pointer", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", marginBottom:20, padding:0 },
   detailGrid:       { display:"grid", gridTemplateColumns:"360px 1fr", gap:24 },
   detailGridMobile: { display:"flex", flexDirection:"column", gap:16 },
-  detailCard:  { background:"#0f0f18", border:"1px solid #1e1e30", borderRadius:12, overflow:"hidden" },
-  artThumb:    { height:200, background:"linear-gradient(135deg,#1a1030 0%,#0f0f18 100%)", display:"flex", alignItems:"center", justifyContent:"center", borderBottom:"1px solid #1e1e30" },
-  artThumbIcon:{ fontSize:60, color:"#2a2a40" },
+  detailCard:  { background:"#F9F9F7", border:"1px solid #C6C6C8", borderRadius:12, overflow:"hidden" },
+  artThumb:    { height:200, background:"linear-gradient(135deg,#EAE9F3 0%,#FFFFFF 100%)", display:"flex", alignItems:"center", justifyContent:"center", borderBottom:"1px solid #C6C6C8" },
+  artThumbIcon:{ fontSize:60, color:"#C6C6C8" },
   detailInfo:      { padding:"20px 22px" },
   detailStatusRow: { marginBottom:10 },
-  detailTitle:     { fontSize:22, fontFamily:"sans-serif", margin:"0 0 4px", fontWeight:700 },
-  detailArtist:    { color:"#a78bfa", fontFamily:"sans-serif", fontSize:14, margin:"0 0 12px" },
+  detailTitle:     { fontSize:22, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", margin:"0 0 4px", fontWeight:700 },
+  detailArtist:    { color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, margin:"0 0 12px" },
   detailMeta:      { display:"flex", gap:8, flexWrap:"wrap", marginBottom:16 },
-  metaTag:         { background:"#1e1e30", padding:"2px 8px", borderRadius:4, fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  metaTagPlain:    { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  historyPanel:    { background:"#0f0f18", border:"1px solid #1e1e30", borderRadius:12, padding:"22px 24px", display:"flex", flexDirection:"column" },
+  metaTag:         { background:"#C6C6C8", padding:"2px 8px", borderRadius:4, fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  metaTagPlain:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  historyPanel:    { background:"#F9F9F7", border:"1px solid #C6C6C8", borderRadius:12, padding:"22px 24px", display:"flex", flexDirection:"column" },
   historyHeader:   { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 },
-  historyTitle:    { fontSize:16, fontFamily:"sans-serif", fontWeight:600, margin:0 },
-  addEventBtn:     { padding:"6px 14px", borderRadius:8, border:"1px solid #a78bfa55", background:"#1a1030", color:"#a78bfa", cursor:"pointer", fontSize:12, fontFamily:"sans-serif" },
+  historyTitle:    { fontSize:16, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:600, margin:0 },
+  addEventBtn:     { padding:"6px 14px", borderRadius:8, border:"1px solid #5A57A655", background:"#EAE9F3", color:"#5A57A6", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   timeline:        { display:"flex", flexDirection:"column", gap:0 },
   timelineItem:    { display:"flex", gap:14 },
   timelineLine:    { display:"flex", flexDirection:"column", alignItems:"center", paddingTop:4, flexShrink:0, width:16 },
   timelineDot:     { width:10, height:10, borderRadius:"50%", flexShrink:0 },
-  timelineConnector:{ flex:1, width:2, background:"#1e1e30", marginTop:4, minHeight:16 },
+  timelineConnector:{ flex:1, width:2, background:"#C6C6C8", marginTop:4, minHeight:16 },
   timelineBody:    { paddingBottom:20, flex:1 },
   timelineTop:     { display:"flex", alignItems:"center", gap:8, marginBottom:6, flexWrap:"wrap" },
-  eventTag:        { padding:"2px 8px", borderRadius:12, fontSize:12, fontFamily:"sans-serif" },
-  timelineDate:    { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  timelineCp:      { fontSize:13, fontFamily:"sans-serif", color:"#ccc", marginBottom:4, display:"flex", alignItems:"center", gap:5 },
+  eventTag:        { padding:"2px 8px", borderRadius:12, fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  timelineDate:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  timelineCp:      { fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", color:"#5E6367", marginBottom:4, display:"flex", alignItems:"center", gap:5 },
   timelinePrices:  { display:"flex", alignItems:"center", gap:8, marginBottom:4, flexWrap:"wrap" },
-  oldPrice:        { fontSize:13, color:"#555", fontFamily:"sans-serif", textDecoration:"line-through" },
-  arrow:           { color:"#555", fontSize:12 },
-  newPrice:        { fontSize:15, fontFamily:"sans-serif", fontWeight:600 },
-  timelineMemo:    { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  formCard:         { background:"#0f0f18", border:"1px solid #1e1e30", borderRadius:12, padding:"24px 24px 20px" },
-  formSectionTitle: { fontSize:12, letterSpacing:"0.08em", color:"#a78bfa", fontFamily:"sans-serif", marginBottom:14, fontWeight:600 },
+  oldPrice:        { fontSize:13, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textDecoration:"line-through" },
+  arrow:           { color:"#5E6367", fontSize:12 },
+  newPrice:        { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:600 },
+  timelineMemo:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  formCard:         { background:"#F9F9F7", border:"1px solid #C6C6C8", borderRadius:12, padding:"24px 24px 20px" },
+  formSectionTitle: { fontSize:12, letterSpacing:"0.08em", color:"#5A57A6", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", marginBottom:14, fontWeight:600 },
   formGrid:         { display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px 20px" },
-  formLabel:        { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  formInput:        { background:"#13131e", border:"1px solid #2a2a40", borderRadius:8, padding:"9px 12px", color:"#e2e0f0", fontSize:13, fontFamily:"sans-serif", outline:"none", width:"100%", boxSizing:"border-box", WebkitAppearance:"none", appearance:"none" },
-  formSub:          { color:"#aaa", fontFamily:"sans-serif", fontSize:13, marginBottom:20 },
-  submitBtn:        { marginTop:20, padding:"11px 28px", background:"#a78bfa", color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:14, fontFamily:"sans-serif", fontWeight:600 },
-  submitDisabled:   { background:"#2a2a40", color:"#555", cursor:"not-allowed" },
-  cpTypeBadge:  { padding:"2px 8px", borderRadius:12, fontSize:11, fontFamily:"sans-serif", border:"1px solid" },
-  cpLink:       { color:"#a78bfa", cursor:"pointer", textDecoration:"underline dotted" },
-  cpArtworkItem:{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #13131e", fontSize:13, fontFamily:"sans-serif", color:"#ccc" },
-  cpDropdown:     { position:"absolute", top:"100%", left:0, right:0, background:"#0f0f18", border:"1px solid #2a2a40", borderRadius:8, zIndex:100, marginTop:4, boxShadow:"0 4px 20px #00000066" },
-  cpDropdownItem: { padding:"8px 12px", cursor:"pointer", fontSize:13, fontFamily:"sans-serif", color:"#ccc" },
-  cpDropdownClose:{ width:"100%", padding:"8px", background:"none", border:"none", borderTop:"1px solid #1e1e30", color:"#aaa", cursor:"pointer", fontSize:12, fontFamily:"sans-serif" },
+  formLabel:        { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  formInput:        { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"9px 12px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", width:"100%", boxSizing:"border-box", WebkitAppearance:"none", appearance:"none" },
+  formSub:          { color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:13, marginBottom:20 },
+  submitBtn:        { marginTop:20, padding:"11px 28px", background:"#5A57A6", color:"#fff", border:"none", borderRadius:8, cursor:"pointer", fontSize:14, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:600 },
+  submitDisabled:   { background:"#C6C6C8", color:"#5E6367", cursor:"not-allowed" },
+  cpTypeBadge:  { padding:"2px 8px", borderRadius:12, fontSize:11, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", border:"1px solid" },
+  cpLink:       { color:"#5A57A6", cursor:"pointer", textDecoration:"none" },
+  cpArtworkItem:{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #C6C6C8", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", color:"#5E6367" },
+  cpDropdown:     { position:"absolute", top:"100%", left:0, right:0, background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, zIndex:100, marginTop:4, boxShadow:"0 4px 20px #00000066" },
+  cpDropdownItem: { padding:"8px 12px", cursor:"pointer", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", color:"#5E6367" },
+  cpDropdownClose:{ width:"100%", padding:"8px", background:"none", border:"none", borderTop:"1px solid #C6C6C8", color:"#5E6367", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   priceBlock:   { display:"flex", flexDirection:"column", gap:2, alignItems:"flex-end" },
   priceRow:     { display:"flex", alignItems:"baseline", width:"100%" },
-  priceLabel:   { fontSize:12, color:"#aaa", fontFamily:"sans-serif", width:28, flexShrink:0, whiteSpace:"nowrap" },
+  priceLabel:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", width:28, flexShrink:0, whiteSpace:"nowrap" },
   priceVal:     { fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textAlign:"right", flex:1, whiteSpace:"nowrap" },
-  purchasedAt:  { fontSize:12, color:"#aaa", fontFamily:"sans-serif", marginTop:4 },
-  appraisalChip:{ background:"#f59e0b11", padding:"1px 6px", borderRadius:4, fontSize:12, color:"#f59e0b", fontFamily:"sans-serif", flexShrink:0, whiteSpace:"nowrap", border:"1px solid #f59e0b33" },
+  purchasedAt:  { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", marginTop:4 },
+  appraisalChip:{ background:"#EEEEEC", padding:"3px 10px", borderRadius:999, fontSize:11, lineHeight:1.4, color:"#8D2728", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0, whiteSpace:"nowrap", border:"1px solid #D0D0CE", display:"inline-block" },
   workList:     { display:"flex", flexDirection:"column" },
-  workRow:      { display:"flex", alignItems:"center", gap:6, padding:"10px 4px", cursor:"pointer", transition:"background 0.15s", borderBottom:"1px solid #13131e" },
-  workMain:     { flex:1, minWidth:0, overflow:"hidden" },
-  workId:       { fontFamily:"'Courier New',monospace", fontSize:14, color:"#a78bfa", letterSpacing:"0.02em", flexShrink:0, width:70, fontWeight:700 },
+  workRow:      { display:"flex", alignItems:"flex-start", gap:6, padding:"10px 4px", cursor:"pointer", transition:"background 0.15s", borderBottom:"1px solid #C6C6C8" },
+  workMain:     { flex:1, minWidth:0 },
+  workId:       { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, color:"#1a1919", letterSpacing:"0.02em", flexShrink:0, width:70, fontWeight:700 },
   workTitle:    { fontWeight:600, fontSize:14, marginBottom:4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
-  workMeta:     { display:"flex", gap:6, fontSize:12, color:"#bbb", fontFamily:"sans-serif", flexWrap:"wrap", alignItems:"center" },
+  workMeta:     { display:"flex", gap:6, fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexWrap:"wrap", alignItems:"center" },
   workRight:    { flexShrink:0, display:"flex", flexDirection:"column", alignItems:"stretch", gap:2, minWidth:150 },
-  plainText:    { fontSize:12, color:"#ccc", fontFamily:"sans-serif", whiteSpace:"nowrap", flexShrink:0 },
-  dot:          { fontSize:12, color:"#444", fontFamily:"sans-serif", flexShrink:0 },
+  plainText:    { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap", flexShrink:0 },
+  dot:          { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", flexShrink:0 },
   tabBar:       { display:"flex", gap:4, flexWrap:"wrap", marginBottom:12 },
-  tab:          { padding:"4px 10px", borderRadius:20, border:"1px solid #2a2a40", background:"transparent", color:"#aaa", cursor:"pointer", fontSize:12, fontFamily:"sans-serif", transition:"background 0.15s" },
-  tabActive:    { background:"#1e1e30", color:"#e2e0f0", borderColor:"#a78bfa44" },
-  tabCount:     { fontSize:10, color:"#666", marginLeft:3 },
+  tab:          { padding:"4px 10px", borderRadius:20, border:"1px solid #C6C6C8", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:12, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", transition:"background 0.15s" },
+  tabActive:    { background:"#081319", color:"#fff", borderColor:"#081319" },
+  tabCount:     { fontSize:10, color:"#5E6367", marginLeft:3 },
   artistHeader: { marginBottom:16 },
   artistName:   { fontSize:16, fontWeight:600, marginBottom:2 },
-  artistKana:   { fontSize:12, color:"#aaa", fontFamily:"sans-serif" },
-  artistCount:  { fontSize:12, color:"#38bdf8", fontFamily:"sans-serif" },
+  artistKana:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  artistCount:  { fontSize:12, color:"#38bdf8", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   registerOverlay:  { position:"fixed", inset:0, background:"#00000088", zIndex:200, display:"flex", alignItems:"flex-end" },
-  registerMenu:     { background:"#0f0f18", border:"1px solid #1e1e30", borderRadius:"12px 12px 0 0", width:"100%", padding:"20px 20px 32px", position:"fixed", bottom:0, left:0, right:0, zIndex:201 },
-  registerMenuTitle:{ fontSize:14, fontWeight:600, fontFamily:"sans-serif", marginBottom:16, color:"#e2e0f0" },
-  registerMenuSub:  { fontSize:12, color:"#aaa", fontFamily:"sans-serif", marginBottom:8 },
-  registerMenuItem: { display:"flex", alignItems:"center", gap:12, padding:"14px 0", borderBottom:"1px solid #1e1e30", cursor:"pointer", width:"100%", boxSizing:"border-box" as const },
+  registerMenu:     { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:"12px 12px 0 0", width:"100%", padding:"20px 20px 32px", position:"fixed", bottom:0, left:0, right:0, zIndex:201 },
+  registerMenuTitle:{ fontSize:14, fontWeight:600, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", marginBottom:16, color:"#1a1919" },
+  registerMenuSub:  { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", marginBottom:8 },
+  registerMenuItem: { display:"flex", alignItems:"center", gap:12, padding:"14px 0", borderBottom:"1px solid #C6C6C8", cursor:"pointer", width:"100%", boxSizing:"border-box" as const },
   registerMenuIcon: { fontSize:20 },
-  bottomNav:        { position:"fixed", bottom:0, left:0, right:0, height:60, background:"#0f0f18", borderTop:"1px solid #1e1e30", display:"flex", alignItems:"center", zIndex:100 },
-  bottomNavItem:    { flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2, cursor:"pointer", height:"100%", background:"none", border:"none", color:"#666", fontFamily:"sans-serif" },
-  bottomNavActive:  { color:"#a78bfa" },
-  bottomNavIcon:    { fontSize:18 },
-  bottomNavLabel:   { fontSize:10 },
-  bottomNavPlus:    { flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2, cursor:"pointer", height:"100%", background:"none", border:"none", fontFamily:"sans-serif", color:"#a78bfa" },
+  bottomNavWrap:    { position:"fixed", bottom:0, left:0, right:0, margin:"0 calc(12px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))", height:58, display:"flex", alignItems:"center", gap:10, zIndex:100 },
+  bottomNavBar:     { flex:1, height:"100%", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:999, display:"flex", alignItems:"center", padding:5, boxShadow:"0 4px 14px #00000014", position:"relative" },
+  bottomNavItem:    { minWidth:40, width:"16.666%", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", height:"100%", background:"none", border:"none", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", position:"relative" },
+  bottomNavHighlight: { width:"100%", height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", borderRadius:999, position:"relative", left:1 },
+  bottomNavFab:     { width:58, height:58, flexShrink:0, background:"#1a1919", borderRadius:999, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", cursor:"pointer", border:"none", boxShadow:"0 4px 14px #00000030", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
 };
 
 // ─── スマホ取引先カードスタイル ──────────────────────────────────
 const MC = {
-  card:        { display:"flex", alignItems:"center", gap:10, padding:"12px 8px", cursor:"pointer", transition:"background 0.15s", borderBottom:"1px solid #13131e" },
+  card:        { display:"flex", alignItems:"flex-start", gap:10, padding:"12px 8px", cursor:"pointer", transition:"background 0.15s", borderBottom:"1px solid #C6C6C8" },
   left:        { flexShrink:0, width:64 },
-  artworkId:   { fontFamily:"'Courier New',monospace", fontSize:12, color:"#a78bfa", fontWeight:700 },
+  artworkId:   { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:12, color:"#1a1919", fontWeight:700 },
   main:        { flex:1, minWidth:0 },
   title:       { fontWeight:700, fontSize:14, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" },
-  artist:      { fontSize:12, color:"#bbb", fontFamily:"sans-serif", whiteSpace:"nowrap" },
+  artist:      { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap" },
   chips:       { display:"flex", gap:4, flexWrap:"wrap", marginTop:4 },
-  chip:        { padding:"1px 6px", borderRadius:10, fontSize:11, fontFamily:"sans-serif", border:"1px solid #2a2a40", color:"#aaa" },
-  price:       { fontSize:13, fontFamily:"sans-serif", color:"#ccc" },
-  date:        { fontSize:11, color:"#aaa", fontFamily:"sans-serif" },
+  chip:        { padding:"1px 6px", borderRadius:10, fontSize:11, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", border:"1px solid #C6C6C8", color:"#5E6367" },
+  price:       { fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", color:"#1a1919" },
+  date:        { fontSize:11, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   right:       { flexShrink:0, textAlign:"right" },
-  statusBadge: { padding:"3px 9px", borderRadius:20, fontSize:11, fontFamily:"sans-serif" },
-  dot:         { fontSize:12, color:"#444" },
-  plainText:   { fontSize:12, color:"#ccc", fontFamily:"sans-serif" },
+  statusBadge: { padding:"3px 9px", borderRadius:20, fontSize:11, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  dot:         { fontSize:12, color:"#5E6367" },
+  plainText:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
 };
 
