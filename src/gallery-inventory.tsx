@@ -5160,27 +5160,6 @@ export default function GalleryApp() {
     return mt && ms;
   }), [counterparties, cpSearch, cpTypeFilter]);
 
-  // ── 統計 ──
-  const stats = useMemo(() => {
-    const now=new Date(), y=now.getFullYear(), m=now.getMonth();
-    const thisMonthRevenue = artworks
-      .filter(a=>a.sold_price&&a.sold_at)
-      .filter(a=>{ const d=new Date(a.sold_at); return d.getFullYear()===y&&d.getMonth()===m; })
-      .reduce((s,a)=>s+a.sold_price,0);
-    const sm = (galleryInfo.fiscalStartMonth || 9) - 1; // 0-indexed
-    const fiscalStart = new Date(m>=sm?y:y-1, sm, 1);
-    const thisFiscalRevenue = artworks
-      .filter(a=>a.sold_price&&a.sold_at&&new Date(a.sold_at)>=fiscalStart)
-      .reduce((s,a)=>s+a.sold_price,0);
-    return {
-      total:    artworks.length,
-      in_stock: artworks.filter(a=>a.status==="in_stock").length,
-      consigned:artworks.filter(a=>a.status==="consigned").length,
-      sold:     artworks.filter(a=>a.status==="sold").length,
-      thisMonthRevenue, thisFiscalRevenue,
-    };
-  }, [artworks, galleryInfo]);
-
   // ── 取引先選択ヘルパー（フォーム内） ──
   const selectCpInForm = (cp, formSetter, nameKey, idKey) => {
     formSetter(p=>({...p, [nameKey]: cpDisplayName(cp), [idKey]: cp.cp_id }));
@@ -5354,30 +5333,25 @@ export default function GalleryApp() {
               { key:"settings",    icon:"", label:"設定" },
             ].map(({key,icon,label})=>(
               <button key={key}
-                style={{...S.navItem,...(activeNav===key?S.navActive:{}),position:"relative",overflow:"hidden"}}
+                style={{...S.navItem,...(activeNav===key?S.navActive:{})}}
                 onClick={()=>{navigateTo(key);setSelectedId(null);setSelectedCpId(null);}}
-                onMouseEnter={e=>{ if(activeNav!==key) e.currentTarget.style.background="#efeeeb"; }}
-                onMouseLeave={e=>{ e.currentTarget.style.background=""; }}>
-                {activeNav===key && <span style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#5A57A6",borderRadius:"0 2px 2px 0"}}/>}
+                onMouseEnter={e=>{ if(activeNav!==key){ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.color="#1a1919"; } }}
+                onMouseLeave={e=>{ e.currentTarget.style.background=""; e.currentTarget.style.color=""; }}>
                 <span style={S.navIcon}><span className="material-icons" style={{fontSize:16,lineHeight:1,verticalAlign:"middle"}}>{icon}</span></span>{label}
               </button>
             ))}
             <div style={S.navDivider}/>
             <button style={{...S.navItem,...S.navAdd}} onClick={()=>navigateTo("add_artwork")}
-              onMouseEnter={e=>{ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; }}>
+              onMouseEnter={e=>{ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; e.currentTarget.style.color="#1a1919"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; e.currentTarget.style.color="#1a1919"; }}>
               <span style={S.navIcon}>＋</span>仕入を登録
             </button>
             <button style={{...S.navItem,...S.navAdd2}} onClick={()=>navigateTo("add_sale")}
-              onMouseEnter={e=>{ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; }}>
+              onMouseEnter={e=>{ e.currentTarget.style.background="#efeeeb"; e.currentTarget.style.borderColor="#efeeeb"; e.currentTarget.style.color="#1a1919"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background="#F9F9F7"; e.currentTarget.style.borderColor="#C6C6C8"; e.currentTarget.style.color="#1a1919"; }}>
               <span style={S.navIcon}>＋</span>売上を登録
             </button>
           </nav>
-          <div style={S.sideStats}>
-            <div style={S.statItem}><span style={{...S.statNum,fontSize:13,color:"#22c55e"}}>{fmt(stats.thisMonthRevenue)}</span><span style={S.statLab}>今月の売上</span></div>
-            <div style={S.statItem}><span style={{...S.statNum,fontSize:13,color:"#22c55e"}}>{fmt(stats.thisFiscalRevenue)}</span><span style={S.statLab}>今期の売上</span></div>
-          </div>
         </aside>
       )}
 
@@ -5814,7 +5788,6 @@ export default function GalleryApp() {
         {/* ══ 日計 ══ */}
         {view==="daily" && (
           <div style={{...S.content,...(!isMobile?S.contentPc:{})}}>
-            <div style={S.pageHeader}><h1 style={S.pageTitle}>日計</h1></div>
             <DailyReport
               artworks={artworks}
               history={history}
@@ -5822,6 +5795,7 @@ export default function GalleryApp() {
               taxSettings={taxSettings}
               galleryInfo={galleryInfo}
               isMobile={isMobile}
+              mainRef={mainRef}
               onSelectArtwork={(id)=>{setSelectedId(id);setView("detail");}}
             />
           </div>
@@ -6374,11 +6348,13 @@ export default function GalleryApp() {
                   </select>
                 </Field>
                 {!["memo","return"].includes(eventForm.event_type)&&(
-                  <Field label={cpLabel(eventForm.event_type)}>
+                  <Field label={cpLabel(eventForm.event_type)} required={eventForm.event_type==="sold"}>
                     <CpSelect
                       value={eventForm.counterparty} cpId={eventForm.counterparty_id}
                       counterparties={counterparties}
-                      placeholder={cpHolder(eventForm.event_type)}
+                      strict={["sold","sold_discount","sold_increase"].includes(eventForm.event_type)}
+                      placeholder={["sold","sold_discount","sold_increase"].includes(eventForm.event_type)
+                        ? "取引先を選択（登録済みのみ）" : cpHolder(eventForm.event_type)}
                       onChange={(name,id)=>setEventForm(p=>({...p,counterparty:name,counterparty_id:id}))}
                       onQuickRegister={quickRegisterCp}
                     />
@@ -6396,9 +6372,9 @@ export default function GalleryApp() {
                 )}
                 <Field label="メモ" fullWidth><input style={S.formInput} placeholder="詳細・経緯など" value={eventForm.memo} onChange={e=>setEF("memo",e.target.value)}/></Field>
               </div>
-              <button style={{...S.submitBtn,...((eventForm.created_at!==""&&!isRealDate(eventForm.created_at))?S.submitDisabled:{})}}
+              <button style={{...S.submitBtn,...((eventForm.created_at!==""&&!isRealDate(eventForm.created_at)||(eventForm.event_type==="sold"&&!eventForm.counterparty_id))?S.submitDisabled:{})}}
                 onClick={addEvent}
-                disabled={eventForm.created_at!==""&&!isRealDate(eventForm.created_at)}>
+                disabled={eventForm.created_at!==""&&!isRealDate(eventForm.created_at)||(eventForm.event_type==="sold"&&!eventForm.counterparty_id)}>
                 {editingHistoryId?"保存する":"記録する"}
               </button>
             </div>
@@ -7296,8 +7272,6 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
   const [selectedItems, setSelectedItems] = useState([]);
   const [artSearch,     setArtSearch]     = useState("");
   const [artTab,        setArtTab]        = useState("ALL");
-  const [cpOpen,        setCpOpen]        = useState(false);
-  const [cpQ,           setCpQ]           = useState("");
 
   const allInStock = artworks
     .filter(a => a.status === "in_stock" || a.status === "consigned")
@@ -7326,11 +7300,6 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
       .some(s => (s||"").toLowerCase().includes(q));
     return matchTab && matchSearch;
   });
-
-  const filteredCps = counterparties.filter(c =>
-    !cpQ || [c.name,c.company].some(s=>(s||"").toLowerCase().includes(cpQ.toLowerCase()))
-  );
-  const cpDisplayName = (cp) => cp ? (cp.name || cp.company || "—") : "—";
 
   const isSelected = (id) => selectedItems.some(i => i.artwork_id === id);
 
@@ -7389,30 +7358,14 @@ function SaleForm({ artworks, counterparties, artists=[], artworkGroups=[], taxS
           </div>
           <div>
             <label style={SF.label}>売上先 <span style={SF.required}>*</span></label>
-            <div style={{position:"relative",marginTop:6}}>
-              <input style={{...S.formInput,paddingRight:32}} placeholder="売上先を選択または入力"
-                value={buyerName} onChange={e=>{setBuyerName(e.target.value);setBuyerId(null);}}
-                onFocus={()=>setCpOpen(true)}/>
-              <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
-                onClick={()=>setCpOpen(o=>!o)}>▾</button>
-              {buyerId&&<div style={{fontSize:12,color:"#5A57A6",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginTop:4}}>✓ 取引先DBと連携済み</div>}
-              {cpOpen&&(
-                <div style={S.cpDropdown}>
-                  <input style={{...S.formInput,margin:"8px 8px 4px",width:"calc(100% - 16px)",fontSize:12,boxSizing:"border-box"}}
-                    placeholder="絞り込み…" value={cpQ} onChange={e=>setCpQ(e.target.value)} autoFocus/>
-                  <div style={{maxHeight:160,overflowY:"auto"}}>
-                    {filteredCps.map(c=>(
-                      <div key={c.id} style={S.cpDropdownItem}
-                        onClick={()=>{setBuyerName(cpDisplayName(c));setBuyerId(c.cp_id);setCpOpen(false);setCpQ("");}}
-                        onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <span style={{fontWeight:600}}>{cpDisplayName(c)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <button style={S.cpDropdownClose} onClick={()=>{setCpOpen(false);setCpQ("");}}>閉じる</button>
-                </div>
-              )}
+            <div style={{marginTop:6}}>
+              <CpSelect
+                strict
+                value={buyerName} cpId={buyerId}
+                counterparties={counterparties}
+                placeholder="取引先を選択（登録済みのみ）"
+                onChange={(name,id)=>{setBuyerName(name);setBuyerId(id);}}
+              />
             </div>
           </div>
         </div>
@@ -7895,16 +7848,9 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
   const [returnIds,   setReturnIds]   = useState({});
   // 売上登録ミニフォーム: { artwork_id, price, tax, buyer_name, buyer_id, date }
   const [saleForm,    setSaleForm]    = useState(null);
-  const [cpOpen,      setCpOpen]      = useState(false);
-  const [cpQ,         setCpQ]         = useState("");
 
   const TAX_RATE = getTaxRate(new Date().toISOString().slice(0,10), taxSettings?.rates||[]);
   const calcTax  = (p) => { const n=Number(p)||0; const rnd=roundFn(taxSettings?.rounding||"floor"); return rnd(n - n / (1 + TAX_RATE)); };
-
-  const filteredCps = counterparties.filter(c =>
-    !cpQ || [c.name,c.company].some(s=>(s||"").toLowerCase().includes(cpQ.toLowerCase()))
-  );
-  const cpDisplayName = (cp) => cp ? (cp.name || cp.company || "—") : "—";
 
   const openSaleForm = (item, artwork) => {
     const price = artwork?.announce_price || item.price || 0;
@@ -7912,12 +7858,11 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
       artwork_id: item.artwork_id,
       price,
       tax: calcTax(price),
-      buyer_name: "",
-      buyer_id:   null,
+      // 委託先をデフォルトの売上先として選択しておく
+      buyer_name: artwork?.consignee || "",
+      buyer_id:   artwork?.consignee_id || null,
       date:       toDay(),
     });
-    setCpOpen(false);
-    setCpQ("");
   };
 
   const toggleReturn = (consignment_id, artwork_id) => {
@@ -8052,7 +7997,7 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
 
                     {/* 売上登録ミニフォーム */}
                     {isSaleOpen && (
-                      <div style={{background:"#FFFFFF",border:"1px solid #C6C6C8",borderRadius:8,padding:"14px",margin:"4px 0 8px"}}>
+                      <div style={{background:"#F9F9F7",border:"1px solid #C6C6C8",borderRadius:8,padding:"14px",margin:"14px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
                         <div style={{fontSize:12,color:"#1a1919",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",fontWeight:600,marginBottom:12}}>
                           売上登録：{item.artist}「{item.title}」
                         </div>
@@ -8060,15 +8005,15 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
                           <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
                             <div style={{flex:1,minWidth:120}}>
                               <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>成約価格 (円)</div>
-                              <input style={{...S.formInput,fontSize:14,textAlign:"right"}}
-                                type="number" value={saleForm.price}
-                                onChange={e=>setSaleForm(p=>({...p,price:Number(e.target.value),tax:calcTax(Number(e.target.value))}))}/>
+                              <PriceInput value={saleForm.price}
+                                onChange={v=>setSaleForm(p=>({...p,price:v,tax:calcTax(v)}))}
+                                style={{fontSize:14,textAlign:"right"}}/>
                             </div>
                             <div style={{flex:1,minWidth:100}}>
                               <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>消費税額 (円)</div>
-                              <input style={{...S.formInput,fontSize:13,textAlign:"right",color:"#1a1919"}}
-                                type="number" value={saleForm.tax}
-                                onChange={e=>setSaleForm(p=>({...p,tax:Number(e.target.value)}))}/>
+                              <PriceInput value={saleForm.tax}
+                                onChange={v=>setSaleForm(p=>({...p,tax:v}))}
+                                style={{fontSize:13,textAlign:"right",color:"#1a1919"}}/>
                             </div>
                             <div style={{flex:1,minWidth:110}}>
                               <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>売上日</div>
@@ -8077,34 +8022,13 @@ function ConsignmentList({ consignments, counterparties, galleryInfo, staffList,
                           </div>
                           <div>
                             <div style={{fontSize:11,color:"#5E6367",marginBottom:4,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif"}}>売上先 *</div>
-                            <div style={{position:"relative"}}>
-                              <div style={{display:"flex",gap:6}}>
-                                <input style={{...S.formInput,flex:1}} placeholder="売上先を選択または入力"
-                                  value={saleForm.buyer_name}
-                                  onChange={e=>setSaleForm(p=>({...p,buyer_name:e.target.value,buyer_id:null}))}
-                                  onFocus={()=>setCpOpen(true)}/>
-                                <button type="button" style={{...S.formInput,width:"auto",padding:"0 10px",cursor:"pointer",flexShrink:0,color:"#5E6367"}}
-                                  onClick={()=>setCpOpen(o=>!o)}>▾</button>
-                              </div>
-                              {saleForm.buyer_id&&<div style={{fontSize:11,color:"#5E6367",marginTop:2}}>✓ 取引先DBと連携済み</div>}
-                              {cpOpen&&(
-                                <div style={S.cpDropdown}>
-                                  <input style={{...S.formInput,margin:"8px 8px 4px",width:"calc(100% - 16px)",fontSize:12,boxSizing:"border-box"}}
-                                    placeholder="絞り込み…" value={cpQ} onChange={e=>setCpQ(e.target.value)} autoFocus/>
-                                  <div style={{maxHeight:140,overflowY:"auto"}}>
-                                    {filteredCps.map(cp=>(
-                                      <div key={cp.id} style={S.cpDropdownItem}
-                                        onClick={()=>{setSaleForm(p=>({...p,buyer_name:cpDisplayName(cp),buyer_id:cp.cp_id}));setCpOpen(false);setCpQ("");}}
-                                        onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
-                                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                                        <span style={{fontWeight:600}}>{cpDisplayName(cp)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <button style={S.cpDropdownClose} onClick={()=>{setCpOpen(false);setCpQ("");}}>閉じる</button>
-                                </div>
-                              )}
-                            </div>
+                            <CpSelect
+                              strict
+                              value={saleForm.buyer_name} cpId={saleForm.buyer_id}
+                              counterparties={counterparties}
+                              placeholder="取引先を選択（登録済みのみ）"
+                              onChange={(name,id)=>setSaleForm(p=>({...p,buyer_name:name,buyer_id:id}))}
+                            />
                           </div>
                           <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
                             <button style={{...S.submitBtn,marginTop:0,padding:"7px 16px",fontSize:12,background:"#EFEFEF",color:"#5E6367",border:"1px solid #C6C6C8"}}
@@ -8890,9 +8814,53 @@ const IS = {
 
 
 // ─── 日計表コンポーネント ─────────────────────────────────
-function DailyReport({ artworks, history, counterparties, taxSettings, galleryInfo, isMobile, onSelectArtwork }) {
+function DailyReport({ artworks, history, counterparties, taxSettings, galleryInfo, isMobile, mainRef, onSelectArtwork }) {
   const fmt  = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "—";
   const [expandedDate, setExpandedDate] = useState(null);
+  const [search, setSearch] = useState("");
+  const [jumpY, setJumpY] = useState("");
+  const [jumpM, setJumpM] = useState("");
+  const [jumpTarget, setJumpTarget] = useState(null); // { type:"fy"|"day", key }
+  const fyRefs  = useRef({});
+  const dayRefs = useRef({});
+  const headerRef = useRef(null);
+
+  // ── ヘッダー（タイトル＋検索・ジャンプ欄）の自動表示・非表示 ──
+  // 下スクロールで隠れ、上スクロールで再表示。ページ上部付近では常に表示。
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const lastScrollTop = useRef(0);
+  useEffect(() => {
+    const el = mainRef?.current;
+    if (!el) return;
+    lastScrollTop.current = el.scrollTop;
+    const onScroll = () => {
+      const y = el.scrollTop;
+      const diff = y - lastScrollTop.current;
+      if (y < 60) setHeaderHidden(false);
+      else if (diff > 4) setHeaderHidden(true);
+      else if (diff < -4) setHeaderHidden(false);
+      setShowBackToTop(y > 300);
+      lastScrollTop.current = y;
+    };
+    el.addEventListener("scroll", onScroll, { passive:true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [mainRef]);
+
+  useEffect(() => {
+    if (!jumpTarget) return;
+    const el = jumpTarget.type === "fy" ? fyRefs.current[jumpTarget.key] : dayRefs.current[jumpTarget.key];
+    const container = mainRef?.current;
+    if (el && container) {
+      // 固定ヘッダーの高さ分オフセットして、ジャンプ先がヘッダーの下に隠れないようにする
+      const headerH = headerRef.current?.offsetHeight || 0;
+      const offset  = el.getBoundingClientRect().top - container.getBoundingClientRect().top - headerH - 12;
+      container.scrollBy({ top: offset, behavior: "smooth" });
+    } else if (el) {
+      el.scrollIntoView({ behavior:"smooth", block:"start" });
+    }
+    setJumpTarget(null);
+  }, [jumpTarget, search, expandedDate]);
 
   // 日付表示（日計ページのみ）：「2026年7月8日（水）」形式
   const WEEKDAY_JA = ["日","月","火","水","木","金","土"];
@@ -9174,8 +9142,25 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
     return `第${getFiscalPeriod(fy)}期（${fy}年${fiscalStartMonth}月 〜 ${endYear}年${endMonth}月）`;
   };
 
-  // 期ごとにグループ化（降順）
-  const fiscalGroups = dailySummaries.reduce((acc, day) => {
+  // ── 検索：作品名・作家名・取引先・メモで絞り込み ──
+  // 各日の合計（purchaseTotal 等）は会計上の実数値なので検索の影響を受けない。
+  // 絞り込まれるのは明細行（purchaseRows 等）と、該当行が1件もない日の非表示のみ。
+  const q = search.trim().toLowerCase();
+  const rowMatches = (r) => !q || [r.artwork?.title, r.artwork?.artist, r.h.counterparty, r.h.memo]
+    .some(s => (s||"").toLowerCase().includes(q));
+  const searchedSummaries = dailySummaries.map(day => {
+    const purchaseRows         = day.purchaseRows.filter(rowMatches);
+    const purchaseDiscountRows = day.purchaseDiscountRows.filter(rowMatches);
+    const purchaseIncreaseRows = day.purchaseIncreaseRows.filter(rowMatches);
+    const soldRows             = day.soldRows.filter(rowMatches);
+    const soldDiscountRows     = day.soldDiscountRows.filter(rowMatches);
+    const soldIncreaseRows     = day.soldIncreaseRows.filter(rowMatches);
+    const hasMatch = !q || [purchaseRows,purchaseDiscountRows,purchaseIncreaseRows,soldRows,soldDiscountRows,soldIncreaseRows].some(a=>a.length>0);
+    return { ...day, purchaseRows, purchaseDiscountRows, purchaseIncreaseRows, soldRows, soldDiscountRows, soldIncreaseRows, hasMatch };
+  }).filter(day => day.hasMatch);
+
+  // 期ごとにグループ化（降順・検索フィルタ後）
+  const fiscalGroups = searchedSummaries.reduce((acc, day) => {
     const fy = getFiscalYear(day.date);
     if (!acc[fy]) acc[fy] = [];
     acc[fy].push(day);
@@ -9183,12 +9168,94 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
   }, {});
   const sortedFiscalYears = Object.keys(fiscalGroups).map(Number).sort((a,b) => b - a);
 
+  // ジャンプ用：全期間の一覧・年一覧（検索に関わらず存在するデータから算出）
+  const allFiscalYears = [...new Set(dailySummaries.map(day => getFiscalYear(day.date)))].sort((a,b) => b - a);
+  const jumpYears = [...new Set(allDates.map(d => d.slice(0,4)))].sort((a,b) => b.localeCompare(a));
+
+  const jumpToFiscalYear = (fy) => {
+    if (fy === "" || fy == null) return;
+    setSearch("");
+    setJumpTarget({ type:"fy", key:Number(fy) });
+  };
+  const jumpToMonth = (ym) => {
+    if (!ym) return;
+    // allDates は降順（新しい順）：指定月以前で最初に見つかった日付（＝指定月内なら最新日、無ければ直前の日付）
+    let target = allDates.find(d => d.slice(0,7) <= ym);
+    if (!target) target = allDates[allDates.length-1]; // 指定月がデータより前なら最古の日付にフォールバック
+    if (!target) return;
+    setSearch("");
+    setExpandedDate(target);
+    setJumpTarget({ type:"day", key:target });
+    setJumpY(""); setJumpM("");
+  };
+
   if (allDates.length === 0) return (
     <div style={{color:"#5E6367",fontSize:13,fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",padding:"60px 0",textAlign:"center"}}>取引データがありません</div>
   );
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:0}}>
+      <div ref={headerRef} style={{...DR.stickyHeader, transform: headerHidden ? "translateY(-100%)" : "translateY(0)"}}>
+        <div style={S.pageHeader}><h1 style={S.pageTitle}>日計</h1></div>
+        {isMobile ? (
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+            <input style={{...DR.searchInput,flex:"none",width:"100%"}} placeholder="作品名・作家・取引先・メモで検索…"
+              value={search} onChange={e=>setSearch(e.target.value)} />
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+              <select style={{...DR.jumpSelect,flex:"none"}} value="" onChange={e=>jumpToFiscalYear(e.target.value)}>
+                <option value="">期</option>
+                {allFiscalYears.map(fy => (
+                  <option key={fy} value={fy}>{getFiscalLabel(fy)}</option>
+                ))}
+              </select>
+              <select style={{...DR.jumpMonthSel,flex:"none"}} value={jumpY} onChange={e=>{ const y=e.target.value; setJumpY(y); if(y&&jumpM) jumpToMonth(`${y}-${jumpM}`); }}>
+                <option value="">年</option>
+                {jumpYears.map(y => <option key={y} value={y}>{y}年</option>)}
+              </select>
+              <select style={{...DR.jumpMonthSel,flex:"none"}} value={jumpM} onChange={e=>{ const m=e.target.value; setJumpM(m); if(jumpY&&m) jumpToMonth(`${jumpY}-${m}`); }}>
+                <option value="">月</option>
+                {Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0")).map(m => <option key={m} value={m}>{Number(m)}月</option>)}
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div style={{...DR.toolbar,flexWrap:"nowrap"}}>
+            <input style={{...DR.searchInput,flex:"3 1 0%"}} placeholder="作品名・作家・取引先・メモで検索…"
+              value={search} onChange={e=>setSearch(e.target.value)} />
+            <select style={{...DR.jumpSelect,flex:"1 1 0%"}} value="" onChange={e=>jumpToFiscalYear(e.target.value)}>
+              <option value="">期にジャンプ…</option>
+              {allFiscalYears.map(fy => (
+                <option key={fy} value={fy}>{getFiscalLabel(fy)}</option>
+              ))}
+            </select>
+            <select style={{...DR.jumpMonthSel,flex:"1 1 0%"}} value={jumpY} onChange={e=>{ const y=e.target.value; setJumpY(y); if(y&&jumpM) jumpToMonth(`${y}-${jumpM}`); }}>
+              <option value="">年</option>
+              {jumpYears.map(y => <option key={y} value={y}>{y}年</option>)}
+            </select>
+            <select style={{...DR.jumpMonthSel,flex:"1 1 0%"}} value={jumpM} onChange={e=>{ const m=e.target.value; setJumpM(m); if(jumpY&&m) jumpToMonth(`${jumpY}-${m}`); }}>
+              <option value="">月</option>
+              {Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0")).map(m => <option key={m} value={m}>{Number(m)}月</option>)}
+            </select>
+          </div>
+        )}
+        {q && (
+          <div style={DR.resultCount}>
+            {searchedSummaries.reduce((s,d)=>s+d.purchaseRows.length+d.purchaseDiscountRows.length+d.purchaseIncreaseRows.length+d.soldRows.length+d.soldDiscountRows.length+d.soldIncreaseRows.length,0)}件ヒット
+          </div>
+        )}
+      </div>
+      <button
+        onClick={() => mainRef?.current?.scrollTo({ top:0, behavior:"smooth" })}
+        style={{...DR.backToTop, bottom: isMobile ? "calc(76px + env(safe-area-inset-bottom))" : 32,
+          opacity: showBackToTop ? 1 : 0, pointerEvents: showBackToTop ? "auto" : "none"}}
+        onMouseEnter={e=>{ e.currentTarget.style.transform = "scale(1.06)"; }}
+        onMouseLeave={e=>{ e.currentTarget.style.transform = "scale(1)"; }}
+        aria-label="トップに戻る">
+        <span className="material-icons" style={{fontSize:22,lineHeight:1}}>arrow_upward</span>
+      </button>
+      {q && sortedFiscalYears.length===0 && (
+        <div style={DR.noResult}>該当する取引が見つかりません</div>
+      )}
       {sortedFiscalYears.map(fy => {
         const days = fiscalGroups[fy];
         const fyPurchaseTotal = days.reduce((s,d) => s + d.purchaseTotal - d.purchaseDiscountTotal + (d.purchaseIncreaseTotal||0), 0);
@@ -9198,7 +9265,7 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
         const fyProfitLoss    = fySoldExcl - fyCostExcl;
 
         return (
-          <div key={fy}>
+          <div key={fy} ref={el => { fyRefs.current[fy] = el; }}>
             {/* 期ヘッダー＋累計 */}
             <div style={DR.fiscalHeader}>
               <div style={DR.fiscalTitle}>{getFiscalLabel(fy)}</div>
@@ -9220,9 +9287,9 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
             {/* 日別明細 */}
             {days.map(({ date, purchaseRows, purchaseDiscountRows, purchaseIncreaseRows, soldRows, soldDiscountRows, soldIncreaseRows, purchaseTotal, purchaseDiscountTotal, purchaseIncreaseTotal, soldTotal, soldDiscountTotal, soldIncreaseTotal, soldExclTotal, costExclTotal }) => {
-              const isExpanded = expandedDate === date;
+              const isExpanded = q ? true : (expandedDate === date);
               return (
-                <div key={date} style={DR.dayBlock}>
+                <div key={date} style={DR.dayBlock} ref={el => { dayRefs.current[date] = el; }}>
 
             {/* 日付ヘッダー */}
             <div style={DR.dayHeader}
@@ -9584,6 +9651,14 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
 
 
 const DR = {
+  stickyHeader:  { position:"sticky", top:0, zIndex:5, background:"#F9F9F7", transition:"transform 0.25s ease" },
+  backToTop:     { position:"fixed", right:24, width:46, height:46, borderRadius:"50%", background:"#081319", color:"#fff", border:"none", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:"0 4px 14px rgba(0,0,0,0.25)", transition:"opacity 0.25s ease, transform 0.15s ease", zIndex:40 },
+  toolbar:       { display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 },
+  searchInput:   { flex:"2 1 220px", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 14px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", boxSizing:"border-box" },
+  jumpSelect:    { flex:"1 1 170px", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 10px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", boxSizing:"border-box" },
+  jumpMonthSel:  { flex:"1 1 90px", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 10px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", boxSizing:"border-box" },
+  resultCount:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textAlign:"right", marginBottom:10 },
+  noResult:      { color:"#5E6367", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", padding:"60px 0", textAlign:"center" },
   dayBlock:      { borderBottom:"1px solid #C6C6C8" },
   dayHeader:     { padding:"14px 10px", cursor:"pointer", transition:"background 0.15s", background:"#F9F9F7" },
   dayDateRow:    { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 },
@@ -9798,7 +9873,7 @@ function Field({ label, required, fullWidth, badge, children }) {
   );
 }
 
-function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
+function CpSelect({ counterparties, value, cpId, onChange, placeholder, strict=false }) {
   const [open, setOpen] = useState(false);
   const [q, setQ]       = useState("");
   const [cursor, setCursor] = useState(-1);
@@ -9819,14 +9894,17 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder }) {
   return (
     <div style={{ position:"relative" }}>
       <div style={{ position:"relative" }}>
-        <input style={{ ...S.formInput, flex:1, paddingRight:32 }} placeholder={placeholder||"取引先を選択または入力"}
-          value={value} onChange={e => { onChange(e.target.value, null); setCursor(-1); }}
+        <input style={{ ...S.formInput, flex:1, paddingRight:32, ...(strict?{cursor:"pointer", background:"#FFFFFF"}:{}) }}
+          placeholder={placeholder||(strict?"取引先を選択（登録済みのみ）":"取引先を選択または入力")}
+          value={value} readOnly={strict}
+          onChange={e => { if (strict) return; onChange(e.target.value, null); setCursor(-1); }}
           onFocus={() => setOpen(true)}
+          onClick={() => { if (strict) setOpen(o => !o); }}
           onKeyDown={handleKey} />
         <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
           onClick={() => setOpen(o => !o)}>▾</button>
       </div>
-      {cpId && <div style={{ fontSize:11, color:"#5A57A6", marginTop:2 }}>✓ 取引先DBと連携済み</div>}
+      {!strict && cpId && <div style={{ fontSize:11, color:"#5A57A6", marginTop:2 }}>✓ 取引先DBと連携済み</div>}
       {open && (
         <div style={S.cpDropdown}>
           <input style={{ ...S.formInput, margin:"8px 8px 4px", width:"calc(100% - 16px)", fontSize:12, boxSizing:"border-box" }}
@@ -9861,15 +9939,11 @@ const S = {
   logoSub:     { fontSize:9, letterSpacing:"0.1em", color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   nav:         { display:"flex", flexDirection:"column", gap:4 },
   navItem:     { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:8, border:"none", background:"transparent", color:"#5E6367", cursor:"pointer", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", transition:"background 0.15s, color 0.15s", textAlign:"left" },
-  navActive:   { background:"#C6C6C8", color:"#1a1919" },
+  navActive:   { background:"#efeeeb", color:"#1a1919" },
   navAdd:      { marginTop:0, background:"#F9F9F7", color:"#1a1919", border:"1px solid #C6C6C8" },
   navAdd2:     { background:"#F9F9F7", color:"#1a1919", border:"1px solid #C6C6C8" },
   navDivider:  { height:1, background:"#C6C6C8", margin:"8px 0" },
   navIcon:     { fontSize:16 },
-  sideStats:   { marginTop:"auto", display:"flex", flexDirection:"column", gap:10, padding:"14px 12px", background:"#F9F9F7", borderRadius:10, border:"1px solid #C6C6C8" },
-  statItem:    { display:"flex", justifyContent:"space-between", alignItems:"center" },
-  statNum:     { fontSize:20, fontWeight:700, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
-  statLab:     { fontSize:11, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   main:        { flex:1, overflow:"auto", background:"#F9F9F7" },
   content:     { padding:"24px 16px 70px" },
   contentPc:   { padding:"36px 40px", maxWidth:800, margin:"0 auto", boxSizing:"border-box" },
