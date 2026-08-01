@@ -118,7 +118,7 @@ const initialConsignments = [
     id: 1,
     date: "2023-12-02",
     consignee_id: null,
-    consignee_name: "六本木ヒルズ",
+    consignee_name: "みどり坂ヒルズ",
     staff_id: 1,
     staff_name: "山田 太郎",
     note: "",
@@ -134,7 +134,7 @@ const initialConsignments = [
     id: 2,
     date: "2024-05-14",
     consignee_id: "0003",
-    consignee_name: "ホテル椿山荘",
+    consignee_name: "ホテル蒼月閣",
     staff_id: 2,
     staff_name: "鈴木 花子",
     note: "",
@@ -154,7 +154,7 @@ const initialConsignments = [
     id: 3,
     date: "2024-09-06",
     consignee_id: "0018",
-    consignee_name: "丸の内ビル",
+    consignee_name: "中央通りビジネスタワー",
     staff_id: 1,
     staff_name: "山田 太郎",
     note: "",
@@ -167,7 +167,7 @@ const initialConsignments = [
     id: 4,
     date: "2025-08-08",
     consignee_id: null,
-    consignee_name: "品川インターシティ",
+    consignee_name: "湾岸インターシティ",
     staff_id: 2,
     staff_name: "鈴木 花子",
     note: "",
@@ -180,7 +180,7 @@ const initialConsignments = [
     id: 5,
     date: "2025-10-12",
     consignee_id: "0017",
-    consignee_name: "東京ミッドタウン",
+    consignee_name: "セントラルパークプラザ",
     staff_id: 1,
     staff_name: "山田 太郎",
     note: "",
@@ -283,9 +283,9 @@ const initialCounterparties = [
   },
   {
     id: 3, cp_id: "0003", invoice_no: "T9876543210987", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: null,
-    company: "ホテル椿山荘", department: "宴会・文化事業部",
-    email: "art@tsubakiyama.example.com", phone: "03-9876-5432",
-    zip: "112-8680", address: "東京都文京区関口2-10-8", building: "", note: "ロビー展示スペースあり。",
+    company: "ホテル蒼月閣", department: "宴会・文化事業部",
+    email: "art@sougetsukaku.example.com", phone: "03-9876-5432",
+    zip: "104-0028", address: "東京都中央区八重洲2-3-1", building: "", note: "ロビー展示スペースあり。",
   },
   {
     id: 4, cp_id: "0004", invoice_no: "T1111222233334", invoice_from: "2023-10-01", invoice_to: null, type_id: 3, name: "山本 竜", name_kana: "ヤマモト リュウ",
@@ -305,9 +305,9 @@ const initialCounterparties = [
     email: "", phone: "", zip: "", address: "", building: "", note: "作家直営アトリエ。直接買付。",
   },
   {
-    id: 7, cp_id: "0007", invoice_no: "T3333444455556", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "アート オオサカ ジッコウ イインカイ",
-    company: "アート大阪実行委員会", department: null,
-    email: "", phone: "", zip: "", address: "", building: "", note: "アート大阪出展作家より仕入れ。",
+    id: 7, cp_id: "0007", invoice_no: "T3333444455556", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "ナニワ アート フェア ジッコウ イインカイ",
+    company: "浪速アートフェア実行委員会", department: null,
+    email: "", phone: "", zip: "", address: "", building: "", note: "浪速アートフェア出展作家より仕入れ。",
   },
   {
     id: 8, cp_id: "0008", invoice_no: "", invoice_from: null, invoice_to: null, type_id: 4, name: null, name_kana: "ガレリア ヴィスタ",
@@ -335,8 +335,8 @@ const initialCounterparties = [
     email: "", phone: "", zip: "", address: "", building: "", note: "東京都内の美術品競売会社。",
   },
   {
-    id: 13, cp_id: "0013", invoice_no: "T7777888899990", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "シンワ オークション",
-    company: "シンワオークション株式会社", department: null,
+    id: 13, cp_id: "0013", invoice_no: "T7777888899990", invoice_from: "2023-10-01", invoice_to: null, type_id: 4, name: null, name_kana: "サイウン オークション",
+    company: "彩雲オークション株式会社", department: null,
     email: "", phone: "", zip: "", address: "", building: "", note: "国内大手美術品オークション会社。",
   },
   {
@@ -354,7 +354,7 @@ const initialCounterparties = [
 const initialArtworks = [
   {
     id: 1, artwork_id: "25EA001", title: "夜明けの海", artist: "田中 誠", artist_id: "0002", artist_kana: "タナカ マコト", medium: "油彩",
-    size: "F30 (90.9×72.7cm)", appraisal: "東京美術倶楽部",
+    size: "F30 (90.9×72.7cm)", appraisal: "光陽美術鑑定会",
     purchase_price: 280000, supplier: "田中 誠", supplier_id: "0001",
     announce_price: 580000,
     consignment_price: null, consignee: null, consignee_id: null, consigned_at: null,
@@ -372,10 +372,10 @@ const initialArtworks = [
   },
   {
     id: 3, artwork_id: "251K001", title: "光の森", artist: "山本 竜", artist_id: "0019", artist_kana: "ヤマモト リュウ", medium: "版画",
-    size: "F20 (72.7×60.6cm)", appraisal: "日動美術財団",
+    size: "F20 (72.7×60.6cm)", appraisal: "明星美術振興財団",
     purchase_price: 150000, supplier: "山本 竜", supplier_id: "0004",
     announce_price: 320000,
-    consignment_price: 300000, consignee: "ホテル椿山荘", consignee_id: "0003", consigned_at: "2025-03-01",
+    consignment_price: 300000, consignee: "ホテル蒼月閣", consignee_id: "0003", consigned_at: "2025-03-01",
     sold_price: null, buyer: null, buyer_id: null,
     status: "consigned", purchased_at: "2025-01-20", sold_at: null,
   },
@@ -387,7 +387,7 @@ const initialHistory = [
   { id: 3, artwork_id: "2493001", event_type: "sold_discount", old_price: 220000, new_price: 200000, counterparty: "田村 一郎",     counterparty_id: "0002", memo: "顧客交渉により値引き",  created_at: "2025-01-15" },
   { id: 4, artwork_id: "2493001", event_type: "sold",     old_price: null,   new_price: 200000, counterparty: "田村 一郎",     counterparty_id: "0002", memo: "田村様コレクションへ",  created_at: "2025-01-15" },
   { id: 5, artwork_id: "251K001", event_type: "purchase", old_price: null,   new_price: 150000, counterparty: "山本 竜",       counterparty_id: "0004", memo: "直接購入",              created_at: "2025-01-20", purchase_tax: 13636, tax_credit: 13636 },
-  { id: 6, artwork_id: "251K001", event_type: "consign",  old_price: null,   new_price: 300000, counterparty: "ホテル椿山荘",  counterparty_id: "0003", memo: "ロビー展示",            created_at: "2025-03-01" },
+  { id: 6, artwork_id: "251K001", event_type: "consign",  old_price: null,   new_price: 300000, counterparty: "ホテル蒼月閣",  counterparty_id: "0003", memo: "ロビー展示",            created_at: "2025-03-01" },
 ];
 
 const additionalArtworks = [
@@ -399,7 +399,7 @@ const additionalArtworks = [
         artist_kana: "マツモト レイ",
         medium: "パステル",
         size: "F50 (116.7×91.0cm)",
-        appraisal: "日動美術財団",
+        appraisal: "明星美術振興財団",
         purchase_price: 350000,
         supplier: "田中アトリエ",
         supplier_id: "0006",
@@ -519,13 +519,13 @@ const additionalArtworks = [
         artist_kana: "ナカムラ アオイ",
         medium: "水彩",
         size: "F50 (116.7×91.0cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 500000,
         supplier: "スペース・ムー",
         supplier_id: "0010",
         announce_price: 1220000,
         consignment_price: 1060000,
-        consignee: "東京ミッドタウン",
+        consignee: "セントラルパークプラザ",
         consignee_id: null,
         consigned_at: "2026-03-22",
         sold_price: null,
@@ -549,7 +549,7 @@ const additionalArtworks = [
         supplier_id: "0010",
         announce_price: 370000,
         consignment_price: 318000,
-        consignee: "六本木ヒルズ",
+        consignee: "みどり坂ヒルズ",
         consignee_id: null,
         consigned_at: "2026-03-24",
         sold_price: null,
@@ -615,7 +615,7 @@ const additionalArtworks = [
         artist_kana: "ワタナベ ケン",
         medium: "シルクスクリーン",
         size: "F6 (41.0×31.8cm)",
-        appraisal: "光仁会",
+        appraisal: "清和美術鑑定会",
         purchase_price: 500000,
         supplier: "田中アトリエ",
         supplier_id: "0006",
@@ -687,9 +687,9 @@ const additionalArtworks = [
         artist_kana: "シミズ タカシ",
         medium: "水彩",
         size: "F3 (27.3×22.0cm)",
-        appraisal: "日動美術財団",
+        appraisal: "明星美術振興財団",
         purchase_price: 500000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 1000000,
         consignment_price: null,
@@ -785,7 +785,7 @@ const additionalArtworks = [
         size: "F100 (162.1×130.3cm)",
         appraisal: "",
         purchase_price: 80000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 230000,
         consignment_price: null,
@@ -905,7 +905,7 @@ const additionalArtworks = [
         size: "F10 (53.0×45.5cm)",
         appraisal: "",
         purchase_price: 73000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 210000,
         consignment_price: null,
@@ -933,7 +933,7 @@ const additionalArtworks = [
         supplier_id: "0009",
         announce_price: 1050000,
         consignment_price: 933000,
-        consignee: "丸の内ビル",
+        consignee: "中央通りビジネスタワー",
         consignee_id: null,
         consigned_at: "2024-09-06",
         sold_price: null,
@@ -1023,9 +1023,9 @@ const additionalArtworks = [
         artist_kana: "ワタナベ ケン",
         medium: "水彩",
         size: "F20 (72.7×60.6cm)",
-        appraisal: "光仁会",
+        appraisal: "清和美術鑑定会",
         purchase_price: 500000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 1060000,
         consignment_price: null,
@@ -1053,7 +1053,7 @@ const additionalArtworks = [
         supplier_id: "0012",
         announce_price: 520000,
         consignment_price: 466000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2025-08-29",
         sold_price: null,
@@ -1095,7 +1095,7 @@ const additionalArtworks = [
         artist_kana: "ナカムラ アオイ",
         medium: "油彩",
         size: "F20 (72.7×60.6cm)",
-        appraisal: "日本美術鑑定協会",
+        appraisal: "全国美術鑑定連盟",
         purchase_price: 573000,
         supplier: "オークションハウス・セントラル",
         supplier_id: "0012",
@@ -1125,7 +1125,7 @@ const additionalArtworks = [
         supplier_id: "0015",
         announce_price: 270000,
         consignment_price: 256000,
-        consignee: "品川インターシティ",
+        consignee: "湾岸インターシティ",
         consignee_id: null,
         consigned_at: "2025-08-08",
         sold_price: null,
@@ -1143,7 +1143,7 @@ const additionalArtworks = [
         artist_kana: "キムラ サキ",
         medium: "油彩",
         size: "F6 (41.0×31.8cm)",
-        appraisal: "日動美術財団",
+        appraisal: "明星美術振興財団",
         purchase_price: 350000,
         supplier: "アトリエ・ノルド",
         supplier_id: "0014",
@@ -1239,7 +1239,7 @@ const additionalArtworks = [
         artist_kana: "ナカムラ アオイ",
         medium: "ミクストメディア",
         size: "F100 (162.1×130.3cm)",
-        appraisal: "日動美術財団",
+        appraisal: "明星美術振興財団",
         purchase_price: 500000,
         supplier: "田中アトリエ",
         supplier_id: "0006",
@@ -1313,7 +1313,7 @@ const additionalArtworks = [
         size: "F50 (116.7×91.0cm)",
         appraisal: "",
         purchase_price: 150000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 450000,
         consignment_price: null,
@@ -1389,7 +1389,7 @@ const additionalArtworks = [
         supplier_id: "0014",
         announce_price: 610000,
         consignment_price: 557000,
-        consignee: "品川インターシティ",
+        consignee: "湾岸インターシティ",
         consignee_id: null,
         consigned_at: "2025-11-09",
         sold_price: null,
@@ -1413,7 +1413,7 @@ const additionalArtworks = [
         supplier_id: "0015",
         announce_price: 920000,
         consignment_price: 795000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2026-04-17",
         sold_price: null,
@@ -1509,7 +1509,7 @@ const additionalArtworks = [
         supplier_id: "0010",
         announce_price: 1350000,
         consignment_price: 1261000,
-        consignee: "東京ミッドタウン",
+        consignee: "セントラルパークプラザ",
         consignee_id: null,
         consigned_at: "2025-10-12",
         sold_price: null,
@@ -1577,7 +1577,7 @@ const additionalArtworks = [
         size: "F20 (72.7×60.6cm)",
         appraisal: "",
         purchase_price: 80000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 240000,
         consignment_price: null,
@@ -1599,7 +1599,7 @@ const additionalArtworks = [
         artist_kana: "イノウエ ダイスケ",
         medium: "シルクスクリーン",
         size: "F50 (116.7×91.0cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 200000,
         supplier: "ガレリア・ヴィスタ",
         supplier_id: "0008",
@@ -1623,7 +1623,7 @@ const additionalArtworks = [
         artist_kana: "ヤマダ ノブオ",
         medium: "油彩",
         size: "F10 (53.0×45.5cm)",
-        appraisal: "光仁会",
+        appraisal: "清和美術鑑定会",
         purchase_price: 500000,
         supplier: "スペース・ムー",
         supplier_id: "0010",
@@ -1647,7 +1647,7 @@ const additionalArtworks = [
         artist_kana: "マツモト レイ",
         medium: "アクリル",
         size: "F3 (27.3×22.0cm)",
-        appraisal: "日本美術鑑定協会",
+        appraisal: "全国美術鑑定連盟",
         purchase_price: 50000,
         supplier: "銀座アートコレクティブ",
         supplier_id: "0009",
@@ -1695,9 +1695,9 @@ const additionalArtworks = [
         artist_kana: "ワタナベ ケン",
         medium: "リトグラフ",
         size: "F15 (65.2×53.0cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 280000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 560000,
         consignment_price: null,
@@ -1719,9 +1719,9 @@ const additionalArtworks = [
         artist_kana: "ハヤシ マサコ",
         medium: "アクリル",
         size: "F6 (41.0×31.8cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 250000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 560000,
         consignment_price: null,
@@ -1841,7 +1841,7 @@ const additionalArtworks = [
         size: "F30 (90.9×72.7cm)",
         appraisal: "",
         purchase_price: 80000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 260000,
         consignment_price: null,
@@ -1887,7 +1887,7 @@ const additionalArtworks = [
         artist_kana: "イノウエ ダイスケ",
         medium: "ミクストメディア",
         size: "F30 (90.9×72.7cm)",
-        appraisal: "日動美術財団",
+        appraisal: "明星美術振興財団",
         purchase_price: 300000,
         supplier: "オークションハウス・セントラル",
         supplier_id: "0012",
@@ -1937,11 +1937,11 @@ const additionalArtworks = [
         size: "F3 (27.3×22.0cm)",
         appraisal: "",
         purchase_price: 350000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 740000,
         consignment_price: 687000,
-        consignee: "六本木ヒルズ",
+        consignee: "みどり坂ヒルズ",
         consignee_id: null,
         consigned_at: "2025-07-19",
         sold_price: null,
@@ -2055,9 +2055,9 @@ const additionalArtworks = [
         artist_kana: "イトウ ミサキ",
         medium: "ミクストメディア",
         size: "F6 (41.0×31.8cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 350000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 1180000,
         consignment_price: null,
@@ -2081,7 +2081,7 @@ const additionalArtworks = [
         size: "F50 (116.7×91.0cm)",
         appraisal: "",
         purchase_price: 600000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 1400000,
         consignment_price: null,
@@ -2181,7 +2181,7 @@ const additionalArtworks = [
         supplier_id: "0009",
         announce_price: 700000,
         consignment_price: 617000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2025-05-29",
         sold_price: null,
@@ -2229,7 +2229,7 @@ const additionalArtworks = [
         supplier_id: "0010",
         announce_price: 690000,
         consignment_price: 629000,
-        consignee: "六本木ヒルズ",
+        consignee: "みどり坂ヒルズ",
         consignee_id: null,
         consigned_at: "2026-05-16",
         sold_price: null,
@@ -2247,7 +2247,7 @@ const additionalArtworks = [
         artist_kana: "サトウ ハナ",
         medium: "素描",
         size: "F3 (27.3×22.0cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 300000,
         supplier: "アトリエ・ノルド",
         supplier_id: "0014",
@@ -2277,7 +2277,7 @@ const additionalArtworks = [
         supplier_id: "0010",
         announce_price: 350000,
         consignment_price: 309000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2025-07-14",
         sold_price: null,
@@ -2325,7 +2325,7 @@ const additionalArtworks = [
         supplier_id: "0012",
         announce_price: 2000000,
         consignment_price: 1789000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2024-05-14",
         sold_price: null,
@@ -2367,7 +2367,7 @@ const additionalArtworks = [
         artist_kana: "キムラ サキ",
         medium: "油彩",
         size: "F20 (72.7×60.6cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 80000,
         supplier: "アトリエ・ノルド",
         supplier_id: "0014",
@@ -2421,7 +2421,7 @@ const additionalArtworks = [
         supplier_id: "0008",
         announce_price: 110000,
         consignment_price: 101000,
-        consignee: "東京ミッドタウン",
+        consignee: "セントラルパークプラザ",
         consignee_id: null,
         consigned_at: "2026-05-01",
         sold_price: null,
@@ -2439,7 +2439,7 @@ const additionalArtworks = [
         artist_kana: "カトウ リツコ",
         medium: "素描",
         size: "F100 (162.1×130.3cm)",
-        appraisal: "日本美術鑑定協会",
+        appraisal: "全国美術鑑定連盟",
         purchase_price: 80000,
         supplier: "田中アトリエ",
         supplier_id: "0006",
@@ -2487,13 +2487,13 @@ const additionalArtworks = [
         artist_kana: "イトウ ミサキ",
         medium: "油彩",
         size: "F30 (90.9×72.7cm)",
-        appraisal: "日本美術鑑定協会",
+        appraisal: "全国美術鑑定連盟",
         purchase_price: 150000,
         supplier: "銀座アートコレクティブ",
         supplier_id: "0009",
         announce_price: 470000,
         consignment_price: 416000,
-        consignee: "六本木ヒルズ",
+        consignee: "みどり坂ヒルズ",
         consignee_id: null,
         consigned_at: "2025-05-02",
         sold_price: null,
@@ -2513,11 +2513,11 @@ const additionalArtworks = [
         size: "F30 (90.9×72.7cm)",
         appraisal: "",
         purchase_price: 50000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 160000,
         consignment_price: 147000,
-        consignee: "六本木ヒルズ",
+        consignee: "みどり坂ヒルズ",
         consignee_id: null,
         consigned_at: "2023-12-02",
         sold_price: null,
@@ -2537,7 +2537,7 @@ const additionalArtworks = [
         size: "F30 (90.9×72.7cm)",
         appraisal: "",
         purchase_price: 150000,
-        supplier: "シンワオークション株式会社",
+        supplier: "彩雲オークション株式会社",
         supplier_id: "0013",
         announce_price: 400000,
         consignment_price: null,
@@ -2589,7 +2589,7 @@ const additionalArtworks = [
         supplier_id: "0014",
         announce_price: 410000,
         consignment_price: 389000,
-        consignee: "丸の内ビル",
+        consignee: "中央通りビジネスタワー",
         consignee_id: null,
         consigned_at: "2026-05-09",
         sold_price: null,
@@ -2607,7 +2607,7 @@ const additionalArtworks = [
         artist_kana: "コバヤシ コウジ",
         medium: "水彩",
         size: "F50 (116.7×91.0cm)",
-        appraisal: "東京美術倶楽部",
+        appraisal: "光陽美術鑑定会",
         purchase_price: 350000,
         supplier: "銀座アートギャラリー・壱番館",
         supplier_id: "0015",
@@ -2685,7 +2685,7 @@ const additionalArtworks = [
         supplier_id: "0010",
         announce_price: 600000,
         consignment_price: 554000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2026-04-01",
         sold_price: null,
@@ -2705,7 +2705,7 @@ const additionalArtworks = [
         size: "F30 (90.9×72.7cm)",
         appraisal: "",
         purchase_price: 280000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 750000,
         consignment_price: null,
@@ -2729,7 +2729,7 @@ const additionalArtworks = [
         size: "F100 (162.1×130.3cm)",
         appraisal: "",
         purchase_price: 200000,
-        supplier: "アート大阪実行委員会",
+        supplier: "浪速アートフェア実行委員会",
         supplier_id: "0007",
         announce_price: 430000,
         consignment_price: null,
@@ -2757,7 +2757,7 @@ const additionalArtworks = [
         supplier_id: "0010",
         announce_price: 160000,
         consignment_price: 144000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2025-02-11",
         sold_price: null,
@@ -2775,13 +2775,13 @@ const additionalArtworks = [
         artist_kana: "ヤマモト リュウ",
         medium: "パステル",
         size: "F50 (116.7×91.0cm)",
-        appraisal: "日動美術財団",
+        appraisal: "明星美術振興財団",
         purchase_price: 97000,
         supplier: "アトリエ・ノルド",
         supplier_id: "0014",
         announce_price: 300000,
         consignment_price: 256000,
-        consignee: "ホテル椿山荘",
+        consignee: "ホテル蒼月閣",
         consignee_id: "0003",
         consigned_at: "2025-02-23",
         sold_price: null,
@@ -2884,7 +2884,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 1060000,
-        counterparty: "東京ミッドタウン",
+        counterparty: "セントラルパークプラザ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2026-03-22"
@@ -2907,7 +2907,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 318000,
-        counterparty: "六本木ヒルズ",
+        counterparty: "みどり坂ヒルズ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2026-03-24"
@@ -3034,7 +3034,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 500000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2024-01-04",
@@ -3115,7 +3115,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 80000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2024-05-02",
@@ -3241,7 +3241,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 80000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2024-05-01",
@@ -3253,7 +3253,7 @@ const additionalHistory = [
         event_type: "purchase_discount",
         old_price: 80000,
         new_price: 73000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入値引き（仕入日より19日後）",
         created_at: "2024-05-20"
@@ -3287,7 +3287,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 933000,
-        counterparty: "丸の内ビル",
+        counterparty: "中央通りビジネスタワー",
         counterparty_id: null,
         memo: "委託",
         created_at: "2024-09-06"
@@ -3367,7 +3367,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 500000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2024-07-28",
@@ -3402,7 +3402,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 466000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2025-08-29"
@@ -3460,7 +3460,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 256000,
-        counterparty: "品川インターシティ",
+        counterparty: "湾岸インターシティ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2025-08-08"
@@ -3599,7 +3599,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 150000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2025-07-21",
@@ -3680,7 +3680,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 557000,
-        counterparty: "品川インターシティ",
+        counterparty: "湾岸インターシティ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2025-11-09"
@@ -3703,7 +3703,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 795000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2026-04-17"
@@ -3773,7 +3773,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 1261000,
-        counterparty: "東京ミッドタウン",
+        counterparty: "セントラルパークプラザ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2025-10-12"
@@ -3808,7 +3808,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 80000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2026-01-30",
@@ -3923,7 +3923,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 280000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2023-11-16",
@@ -3935,7 +3935,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 250000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2023-08-10",
@@ -4017,7 +4017,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 80000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2025-06-30",
@@ -4109,7 +4109,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 350000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2023-06-05",
@@ -4121,7 +4121,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 687000,
-        counterparty: "六本木ヒルズ",
+        counterparty: "みどり坂ヒルズ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2025-07-19"
@@ -4202,7 +4202,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 350000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2025-09-16",
@@ -4225,7 +4225,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 600000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2025-01-29",
@@ -4296,7 +4296,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 617000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2025-05-29"
@@ -4342,7 +4342,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 629000,
-        counterparty: "六本木ヒルズ",
+        counterparty: "みどり坂ヒルズ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2026-05-16"
@@ -4377,7 +4377,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 309000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2025-07-14"
@@ -4423,7 +4423,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 1789000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2024-05-14"
@@ -4504,7 +4504,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 101000,
-        counterparty: "東京ミッドタウン",
+        counterparty: "セントラルパークプラザ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2026-05-01"
@@ -4573,7 +4573,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 416000,
-        counterparty: "六本木ヒルズ",
+        counterparty: "みどり坂ヒルズ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2025-05-02"
@@ -4584,7 +4584,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 50000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2023-05-23",
@@ -4596,7 +4596,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 147000,
-        counterparty: "六本木ヒルズ",
+        counterparty: "みどり坂ヒルズ",
         counterparty_id: null,
         memo: "委託",
         created_at: "2023-12-02"
@@ -4607,7 +4607,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 150000,
-        counterparty: "シンワオークション株式会社",
+        counterparty: "彩雲オークション株式会社",
         counterparty_id: "0013",
         memo: "仕入",
         created_at: "2025-01-05",
@@ -4665,7 +4665,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 389000,
-        counterparty: "丸の内ビル",
+        counterparty: "中央通りビジネスタワー",
         counterparty_id: null,
         memo: "委託",
         created_at: "2026-05-09"
@@ -4746,7 +4746,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 554000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2026-04-01"
@@ -4757,7 +4757,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 280000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2024-10-14",
@@ -4769,7 +4769,7 @@ const additionalHistory = [
         event_type: "purchase",
         old_price: null,
         new_price: 200000,
-        counterparty: "アート大阪実行委員会",
+        counterparty: "浪速アートフェア実行委員会",
         counterparty_id: "0007",
         memo: "仕入",
         created_at: "2024-08-25",
@@ -4804,7 +4804,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 144000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2025-02-11"
@@ -4838,7 +4838,7 @@ const additionalHistory = [
         event_type: "consign",
         old_price: null,
         new_price: 256000,
-        counterparty: "ホテル椿山荘",
+        counterparty: "ホテル蒼月閣",
         counterparty_id: "0003",
         memo: "委託",
         created_at: "2025-02-23"
@@ -5307,7 +5307,7 @@ export default function GalleryApp() {
   };
 
   const cpLabel  = (t) => t==="purchase"||t==="purchase_discount"?"仕入先":t==="sold"||t==="sold_discount"?"売却先":t==="consign"?"委託先":t==="return"?"返却元":"取引先（任意）";
-  const cpHolder = (t) => t==="purchase"||t==="purchase_discount"?"例：田中 誠アトリエ":t==="sold"||t==="sold_discount"?"例：山田 太郎 様":t==="consign"?"例：ホテル椿山荘":"";
+  const cpHolder = (t) => t==="purchase"||t==="purchase_discount"?"例：田中 誠アトリエ":t==="sold"||t==="sold_discount"?"例：山田 太郎 様":t==="consign"?"例：ホテル蒼月閣":"";
 
   // 種別IDから「氏名を主名称にする種別（個人系）」かどうかを判定
   const isPersonType = (typeId) => cpTypeCategory(typeId, counterpartyTypes) === "individual";
@@ -5437,7 +5437,7 @@ export default function GalleryApp() {
                         <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>作品名</div>
                           <input style={S.formInput} value={detailEditForm.title} onChange={e=>setDetailEditForm(p=>({...p,title:e.target.value}))}/></div>
                         <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>作家名</div>
-                          <ArtistSelect value={detailEditForm.artist} artistId={detailEditForm.artist_id} artists={artists}
+                          <ArtistSelect strict value={detailEditForm.artist} artistId={detailEditForm.artist_id} artists={artists}
                             onChange={(name,id,kana)=>setDetailEditForm(p=>({...p,artist:name,artist_id:id,artist_kana:kana}))}
                             onQuickRegister={quickRegisterArtist}/></div>
                         <div><div style={{fontSize:11,color:"#5E6367",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",marginBottom:3}}>技法・素材</div>
@@ -6178,6 +6178,7 @@ export default function GalleryApp() {
                 <Field label="作品名" required><input style={S.formInput} value={artworkForm.title}  onChange={e=>setAF("title",e.target.value)}/></Field>
                 <Field label="作家名" required>
                   <ArtistSelect
+                    strict
                     value={artworkForm.artist}
                     artistId={artworkForm.artist_id}
                     artists={artists}
@@ -7160,7 +7161,7 @@ function ArtistForm({ artists, artworkGroups=[], editId, onSave, nextId, onNextI
 }
 
 // ─── 作家選択コンポーネント ───────────────────────────────
-function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
+function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister, strict=false }) {
   const [open,      setOpen]      = useState(false);
   const [q,         setQ]         = useState("");
   const [showQuick, setShowQuick] = useState(false);
@@ -7198,10 +7199,12 @@ function ArtistSelect({ value, artistId, artists, onChange, onQuickRegister }) {
   return (
     <div style={{position:"relative"}}>
       <div style={{position:"relative"}}>
-        <input style={{...S.formInput,paddingRight:32}} placeholder="作家名を選択または入力"
-          value={value}
-          onChange={e=>{onChange(e.target.value,null,"");setCursor(-1);}}
-          onFocus={()=>setOpen(true)}
+        <input style={{...S.formInput,paddingRight:32,...(strict?{cursor:"pointer",background:"#FFFFFF"}:{})}}
+          placeholder={strict?"作家を選択（登録済みのみ）":"作家名を選択または入力"}
+          value={value} readOnly={strict}
+          onChange={e=>{ if (strict) return; onChange(e.target.value,null,""); setCursor(-1); }}
+          onFocus={()=>{ if (!strict) setOpen(true); }}
+          onClick={()=>{ if (strict) setOpen(o=>!o); }}
           onKeyDown={handleKey}/>
         <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
           onClick={()=>setOpen(o=>!o)}>▾</button>
@@ -8818,8 +8821,11 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
   const fmt  = (n) => n != null ? `¥${Number(n).toLocaleString()}` : "—";
   const [expandedDate, setExpandedDate] = useState(null);
   const [search, setSearch] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [jumpFy, setJumpFy] = useState("");
   const [jumpY, setJumpY] = useState("");
   const [jumpM, setJumpM] = useState("");
+  const [jumpD, setJumpD] = useState("");
   const [jumpTarget, setJumpTarget] = useState(null); // { type:"fy"|"day", key }
   const fyRefs  = useRef({});
   const dayRefs = useRef({});
@@ -9171,22 +9177,30 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
   // ジャンプ用：全期間の一覧・年一覧（検索に関わらず存在するデータから算出）
   const allFiscalYears = [...new Set(dailySummaries.map(day => getFiscalYear(day.date)))].sort((a,b) => b - a);
   const jumpYears = [...new Set(allDates.map(d => d.slice(0,4)))].sort((a,b) => b.localeCompare(a));
+  // 年・月が両方選ばれている場合のみ、実際にデータが存在する日を候補にする
+  const jumpDays = (jumpY && jumpM) ? [...new Set(allDates.filter(d => d.slice(0,7) === `${jumpY}-${jumpM}`).map(d => d.slice(8,10)))].sort((a,b)=>a.localeCompare(b)) : [];
 
-  const jumpToFiscalYear = (fy) => {
-    if (fy === "" || fy == null) return;
-    setSearch("");
-    setJumpTarget({ type:"fy", key:Number(fy) });
-  };
-  const jumpToMonth = (ym) => {
-    if (!ym) return;
-    // allDates は降順（新しい順）：指定月以前で最初に見つかった日付（＝指定月内なら最新日、無ければ直前の日付）
-    let target = allDates.find(d => d.slice(0,7) <= ym);
-    if (!target) target = allDates[allDates.length-1]; // 指定月がデータより前なら最古の日付にフォールバック
-    if (!target) return;
-    setSearch("");
-    setExpandedDate(target);
-    setJumpTarget({ type:"day", key:target });
-    setJumpY(""); setJumpM("");
+  const hasJumpCondition = !!(jumpFy || jumpY || jumpM || jumpD);
+  const clearJump = () => { setJumpFy(""); setJumpY(""); setJumpM(""); setJumpD(""); };
+
+  // 優先度：日付が特定できるならその日付 → 年月のみなら直近の日 → 期のみなら期の見出し
+  const applyJump = () => {
+    if (jumpY && jumpM && jumpD) {
+      const target = `${jumpY}-${jumpM}-${jumpD}`;
+      if (allDates.includes(target)) {
+        setSearch(""); setExpandedDate(target); setJumpTarget({ type:"day", key:target });
+      }
+    } else if (jumpY && jumpM) {
+      const ym = `${jumpY}-${jumpM}`;
+      // allDates は降順（新しい順）：指定月以前で最初に見つかった日付（＝指定月内なら最新日、無ければ直前の日付）
+      let target = allDates.find(d => d.slice(0,7) <= ym);
+      if (!target) target = allDates[allDates.length-1]; // 指定月がデータより前なら最古の日付にフォールバック
+      if (target) { setSearch(""); setExpandedDate(target); setJumpTarget({ type:"day", key:target }); }
+    } else if (jumpFy !== "") {
+      setSearch(""); setJumpTarget({ type:"fy", key:Number(jumpFy) });
+    }
+    clearJump();
+    setFilterOpen(false);
   };
 
   if (allDates.length === 0) return (
@@ -9201,41 +9215,19 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
           <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
             <input style={{...DR.searchInput,flex:"none",width:"100%"}} placeholder="作品名・作家・取引先・メモで検索…"
               value={search} onChange={e=>setSearch(e.target.value)} />
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-              <select style={{...DR.jumpSelect,flex:"none"}} value="" onChange={e=>jumpToFiscalYear(e.target.value)}>
-                <option value="">期</option>
-                {allFiscalYears.map(fy => (
-                  <option key={fy} value={fy}>{getFiscalLabel(fy)}</option>
-                ))}
-              </select>
-              <select style={{...DR.jumpMonthSel,flex:"none"}} value={jumpY} onChange={e=>{ const y=e.target.value; setJumpY(y); if(y&&jumpM) jumpToMonth(`${y}-${jumpM}`); }}>
-                <option value="">年</option>
-                {jumpYears.map(y => <option key={y} value={y}>{y}年</option>)}
-              </select>
-              <select style={{...DR.jumpMonthSel,flex:"none"}} value={jumpM} onChange={e=>{ const m=e.target.value; setJumpM(m); if(jumpY&&m) jumpToMonth(`${jumpY}-${m}`); }}>
-                <option value="">月</option>
-                {Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0")).map(m => <option key={m} value={m}>{Number(m)}月</option>)}
-              </select>
-            </div>
+            <button style={DR.filterBtn} onClick={()=>setFilterOpen(true)}>
+              <span className="material-icons" style={{fontSize:16}}>tune</span>フィルター・ジャンプ
+              {hasJumpCondition && <span style={DR.filterDot}/>}
+            </button>
           </div>
         ) : (
           <div style={{...DR.toolbar,flexWrap:"nowrap"}}>
-            <input style={{...DR.searchInput,flex:"3 1 0%"}} placeholder="作品名・作家・取引先・メモで検索…"
+            <input style={{...DR.searchInput,flex:"4 1 0%"}} placeholder="作品名・作家・取引先・メモで検索…"
               value={search} onChange={e=>setSearch(e.target.value)} />
-            <select style={{...DR.jumpSelect,flex:"1 1 0%"}} value="" onChange={e=>jumpToFiscalYear(e.target.value)}>
-              <option value="">期にジャンプ…</option>
-              {allFiscalYears.map(fy => (
-                <option key={fy} value={fy}>{getFiscalLabel(fy)}</option>
-              ))}
-            </select>
-            <select style={{...DR.jumpMonthSel,flex:"1 1 0%"}} value={jumpY} onChange={e=>{ const y=e.target.value; setJumpY(y); if(y&&jumpM) jumpToMonth(`${y}-${jumpM}`); }}>
-              <option value="">年</option>
-              {jumpYears.map(y => <option key={y} value={y}>{y}年</option>)}
-            </select>
-            <select style={{...DR.jumpMonthSel,flex:"1 1 0%"}} value={jumpM} onChange={e=>{ const m=e.target.value; setJumpM(m); if(jumpY&&m) jumpToMonth(`${jumpY}-${m}`); }}>
-              <option value="">月</option>
-              {Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0")).map(m => <option key={m} value={m}>{Number(m)}月</option>)}
-            </select>
+            <button style={{...DR.filterBtn,flex:"1 1 0%"}} onClick={()=>setFilterOpen(true)}>
+              <span className="material-icons" style={{fontSize:16}}>tune</span>フィルター・ジャンプ
+              {hasJumpCondition && <span style={DR.filterDot}/>}
+            </button>
           </div>
         )}
         {q && (
@@ -9247,12 +9239,64 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
       <button
         onClick={() => mainRef?.current?.scrollTo({ top:0, behavior:"smooth" })}
         style={{...DR.backToTop, bottom: isMobile ? "calc(76px + env(safe-area-inset-bottom))" : 32,
+          right: isMobile ? 12 : 24,
           opacity: showBackToTop ? 1 : 0, pointerEvents: showBackToTop ? "auto" : "none"}}
         onMouseEnter={e=>{ e.currentTarget.style.transform = "scale(1.06)"; }}
         onMouseLeave={e=>{ e.currentTarget.style.transform = "scale(1)"; }}
         aria-label="トップに戻る">
         <span className="material-icons" style={{fontSize:22,lineHeight:1}}>arrow_upward</span>
       </button>
+      {filterOpen && (
+        <>
+          <div style={DR.drawerOverlay} onClick={()=>setFilterOpen(false)} />
+          <div style={{...DR.drawerPanel, width: isMobile ? "85%" : 340}}>
+            <div style={DR.drawerHeader}>
+              <span style={DR.drawerTitle}>表示・ジャンプ設定</span>
+              <button style={DR.drawerClose} onClick={()=>setFilterOpen(false)} aria-label="閉じる">
+                <span className="material-icons" style={{fontSize:20}}>close</span>
+              </button>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
+              <button style={DR.clearBtn} onClick={clearJump}>すべてクリア</button>
+            </div>
+            <div style={{borderTop:"1px solid #ece9e2"}}>
+              <div style={DR.drawerRow}>
+                <span style={DR.drawerLabel}>期</span>
+                <span style={DR.drawerValue}>{jumpFy ? getFiscalLabel(Number(jumpFy)) : "指定なし"}<span className="material-icons" style={{fontSize:15}}>expand_more</span></span>
+                <select style={DR.drawerRowSelect} value={jumpFy} onChange={e=>setJumpFy(e.target.value)}>
+                  <option value="">指定なし</option>
+                  {allFiscalYears.map(fy => <option key={fy} value={fy}>{getFiscalLabel(fy)}</option>)}
+                </select>
+              </div>
+              <div style={DR.drawerRow}>
+                <span style={DR.drawerLabel}>年</span>
+                <span style={DR.drawerValue}>{jumpY ? `${jumpY}年` : "指定なし"}<span className="material-icons" style={{fontSize:15}}>expand_more</span></span>
+                <select style={DR.drawerRowSelect} value={jumpY} onChange={e=>{ setJumpY(e.target.value); setJumpD(""); }}>
+                  <option value="">指定なし</option>
+                  {jumpYears.map(y => <option key={y} value={y}>{y}年</option>)}
+                </select>
+              </div>
+              <div style={{...DR.drawerRow, ...( !jumpY ? {cursor:"default"} : {})}}>
+                <span style={DR.drawerLabel}>月</span>
+                <span style={{...DR.drawerValue, ...( !jumpY ? {color:"#94a3b8"} : {})}}>{jumpM ? `${Number(jumpM)}月` : "指定なし"}<span className="material-icons" style={{fontSize:15}}>expand_more</span></span>
+                <select style={DR.drawerRowSelect} value={jumpM} disabled={!jumpY} onChange={e=>{ setJumpM(e.target.value); setJumpD(""); }}>
+                  <option value="">指定なし</option>
+                  {Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0")).map(m => <option key={m} value={m}>{Number(m)}月</option>)}
+                </select>
+              </div>
+              <div style={{...DR.drawerRow, ...( jumpDays.length===0 ? {cursor:"default"} : {})}}>
+                <span style={DR.drawerLabel}>日</span>
+                <span style={{...DR.drawerValue, ...( jumpDays.length===0 ? {color:"#94a3b8"} : {})}}>{jumpD ? `${Number(jumpD)}日` : "指定なし"}<span className="material-icons" style={{fontSize:15}}>expand_more</span></span>
+                <select style={DR.drawerRowSelect} value={jumpD} disabled={jumpDays.length===0} onChange={e=>setJumpD(e.target.value)}>
+                  <option value="">指定なし</option>
+                  {jumpDays.map(d => <option key={d} value={d}>{Number(d)}日</option>)}
+                </select>
+              </div>
+            </div>
+            <button style={DR.drawerApply} onClick={applyJump}>この条件でジャンプ</button>
+          </div>
+        </>
+      )}
       {q && sortedFiscalYears.length===0 && (
         <div style={DR.noResult}>該当する取引が見つかりません</div>
       )}
@@ -9296,35 +9340,44 @@ function DailyReport({ artworks, history, counterparties, taxSettings, galleryIn
               onClick={()=>setExpandedDate(isExpanded ? null : date)}
               onMouseEnter={e=>e.currentTarget.style.background="#efeeeb"}
               onMouseLeave={e=>e.currentTarget.style.background="#F9F9F7"}>
-              <div style={DR.dayDateRow}>
-                <span style={DR.dayDate}>{formatDayLabel(date)}</span>
-                <span style={DR.expandIcon}>{isExpanded ? "▲" : "▼"}</span>
-              </div>
               {(()=>{
                 const dayPurchaseNet = purchaseTotal - purchaseDiscountTotal + purchaseIncreaseTotal;
                 const daySoldNet = soldTotal - soldDiscountTotal + soldIncreaseTotal;
                 // 売却損益＝売れた作品の売上（税抜）－その作品の原価（税抜）。
                 // その日の仕入総額（dayPurchaseNet）とは無関係（仕入だけの日は売却損益は発生しない）
                 const dayProfitLoss = soldExclTotal - costExclTotal;
-                return (
-                  <div style={DR.summaryGrid}>
-                    <div style={DR.summaryCell}>
-                      <span style={DR.summaryLabel}>仕入高
-                        {purchaseDiscountTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▼{fmt(purchaseDiscountTotal)}</span>}
-                        {purchaseIncreaseTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▲{fmt(purchaseIncreaseTotal)}</span>}
+                return isMobile ? (
+                  <div style={DR.dayRowMobile}>
+                    <span style={DR.dayDateMobile}>{formatDayLabel(date)}{isExpanded ? "▲" : "▼"}</span>
+                    <div style={DR.summaryStack}>
+                      <span style={DR.metricStackRow}>
+                        <span style={DR.metricLabel}>仕入高　</span>{fmt(dayPurchaseNet)}
                       </span>
-                      <span style={{...DR.summaryVal,color:"#1a1919"}}>{fmt(dayPurchaseNet)}</span>
-                    </div>
-                    <div style={DR.summaryCell}>
-                      <span style={DR.summaryLabel}>売上高
-                        {soldDiscountTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▼{fmt(soldDiscountTotal)}</span>}
-                        {soldIncreaseTotal>0&&<span style={{fontSize:12,color:"#1a1919",marginLeft:4}}>▲{fmt(soldIncreaseTotal)}</span>}
+                      <span style={DR.metricStackRow}>
+                        <span style={DR.metricLabel}>売上高　</span>{fmt(daySoldNet)}
                       </span>
-                      <span style={{...DR.summaryVal,color:"#1a1919"}}>{fmt(daySoldNet)}</span>
+                      <span style={DR.metricStackRow}>
+                        <span style={DR.metricLabel}>売却損益高　</span>{fmt(dayProfitLoss)}
+                      </span>
                     </div>
-                    <div style={DR.summaryCell}>
-                      <span style={DR.summaryLabel}>売却損益高</span>
-                      <span style={{...DR.summaryVal,color:"#1a1919"}}>{fmt(dayProfitLoss)}</span>
+                  </div>
+                ) : (
+                  <div style={DR.dayRowSingle}>
+                    <span style={DR.dayDate}>{formatDayLabel(date)}</span>
+                    <div style={DR.summaryInlineGroup}>
+                      <span style={DR.metricInline}>
+                        <span style={DR.metricLabel}>仕入高</span>
+                        <span style={DR.metricVal}>{fmt(dayPurchaseNet)}</span>
+                      </span>
+                      <span style={DR.metricInline}>
+                        <span style={DR.metricLabel}>売上高</span>
+                        <span style={DR.metricVal}>{fmt(daySoldNet)}</span>
+                      </span>
+                      <span style={DR.metricInline}>
+                        <span style={DR.metricLabel}>売却損益高</span>
+                        <span style={DR.metricVal}>{fmt(dayProfitLoss)}</span>
+                      </span>
+                      <span style={DR.expandIcon}>{isExpanded ? "▲" : "▼"}</span>
                     </div>
                   </div>
                 );
@@ -9655,19 +9708,34 @@ const DR = {
   backToTop:     { position:"fixed", right:24, width:46, height:46, borderRadius:"50%", background:"#081319", color:"#fff", border:"none", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:"0 4px 14px rgba(0,0,0,0.25)", transition:"opacity 0.25s ease, transform 0.15s ease", zIndex:40 },
   toolbar:       { display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 },
   searchInput:   { flex:"2 1 220px", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 14px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", boxSizing:"border-box" },
-  jumpSelect:    { flex:"1 1 170px", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 10px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", boxSizing:"border-box" },
-  jumpMonthSel:  { flex:"1 1 90px", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 10px", color:"#1a1919", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", outline:"none", boxSizing:"border-box" },
+  filterBtn:     { display:"flex", alignItems:"center", justifyContent:"center", gap:6, background:"#F9F9F7", border:"1px solid #C6C6C8", borderRadius:8, padding:"8px 12px", fontSize:13, color:"#1a1919", cursor:"pointer", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", position:"relative", boxSizing:"border-box" },
+  filterDot:     { position:"absolute", top:6, right:6, width:7, height:7, borderRadius:"50%", background:"#5A57A6" },
+  drawerOverlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:150 },
+  drawerPanel:   { position:"fixed", top:0, right:0, bottom:0, background:"#FFFFFF", zIndex:151, padding:"20px 18px", boxSizing:"border-box", overflowY:"auto", boxShadow:"-4px 0 20px rgba(0,0,0,0.15)" },
+  drawerHeader:  { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 },
+  drawerTitle:   { fontSize:15, fontWeight:600, color:"#1a1919", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  drawerClose:   { background:"transparent", border:"none", cursor:"pointer", color:"#5E6367", display:"flex", alignItems:"center", padding:4 },
+  clearBtn:      { background:"#1a1919", color:"#fff", fontSize:11, padding:"6px 12px", borderRadius:6, border:"none", cursor:"pointer", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  drawerRow:     { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 0", borderBottom:"1px solid #ece9e2", position:"relative", cursor:"pointer" },
+  drawerRowSelect: { position:"absolute", inset:0, width:"100%", height:"100%", opacity:0, border:"none", margin:0, padding:0, cursor:"pointer" },
+  drawerValue:   { fontSize:13, color:"#5A57A6", display:"flex", alignItems:"center", gap:4 },
+  drawerLabel:   { fontSize:13, color:"#1a1919", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  drawerApply:   { marginTop:24, width:"100%", textAlign:"center", border:"1px solid #C6C6C8", borderRadius:8, padding:10, fontSize:13, color:"#1a1919", background:"#FFFFFF", cursor:"pointer", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   resultCount:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", textAlign:"right", marginBottom:10 },
   noResult:      { color:"#5E6367", fontSize:13, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", padding:"60px 0", textAlign:"center" },
   dayBlock:      { borderBottom:"1px solid #C6C6C8" },
   dayHeader:     { padding:"14px 10px", cursor:"pointer", transition:"background 0.15s", background:"#F9F9F7" },
-  dayDateRow:    { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 },
-  dayDate:       { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em" },
+  dayDate:       { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.05em", flexShrink:0 },
   expandIcon:    { fontSize:10, color:"#5E6367" },
-  summaryGrid:   { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16 },
-  summaryCell:   { display:"flex", flexDirection:"column", gap:3 },
-  summaryLabel:  { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
-  summaryVal:    { fontSize:15, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:700 },
+  dayRowSingle:      { display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, flexWrap:"wrap" },
+  dayRowMobile:      { display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:10 },
+  dayDateMobile:     { fontSize:14, letterSpacing:"0.05em", color:"#1a1919", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap", flexShrink:0 },
+  summaryStack:      { display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 },
+  metricStackRow:    { fontSize:12, color:"#1a1919", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", whiteSpace:"nowrap" },
+  summaryInlineGroup:{ display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" },
+  metricInline:      { display:"flex", alignItems:"baseline", gap:5, whiteSpace:"nowrap" },
+  metricLabel:       { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  metricVal:         { fontSize:13, color:"#1a1919", fontWeight:700, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
   detail:        { padding:"0 6px 14px", display:"flex", flexDirection:"column", gap:10 },
   detailCols:    { display:"flex", flexDirection:"column", gap:16 },
   detailCol:     { display:"flex", flexDirection:"column", gap:10, width:"100%" },
@@ -9700,10 +9768,10 @@ const DR = {
   tfootVal:      { fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontSize:14, fontWeight:700 },
   fiscalHeader:  { background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:10, padding:"14px 14px", margin:"16px 0 0", position:"sticky", top:0, zIndex:10 },
   fiscalTitle:   { fontSize:12, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", letterSpacing:"0.08em", marginBottom:10, fontWeight:600 },
-  fiscalSummary: { display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16 },
+  fiscalSummary: { display:"grid", gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)", gap:16 },
   fiscalCell:    { display:"flex", flexDirection:"column", gap:3 },
   fiscalLabel:   { fontSize:10, color:"#5E6367", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
-  fiscalVal:     { fontSize:16, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:700 },
+  fiscalVal:     { fontSize:16, fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", fontWeight:700, overflowWrap:"break-word", wordBreak:"break-word" },
   invoiceBadge:  { fontSize:9, background:"#22c55e22", color:"#22c55e", border:"1px solid #22c55e44", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
   noInvoiceBadge:{ fontSize:9, background:"#f8717122", color:"#f87171", border:"1px solid #f8717144", padding:"1px 5px", borderRadius:8, whiteSpace:"nowrap" },
 
@@ -9898,7 +9966,7 @@ function CpSelect({ counterparties, value, cpId, onChange, placeholder, strict=f
           placeholder={placeholder||(strict?"取引先を選択（登録済みのみ）":"取引先を選択または入力")}
           value={value} readOnly={strict}
           onChange={e => { if (strict) return; onChange(e.target.value, null); setCursor(-1); }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => { if (!strict) setOpen(true); }}
           onClick={() => { if (strict) setOpen(o => !o); }}
           onKeyDown={handleKey} />
         <button type="button" style={{position:"absolute",right:0,top:0,bottom:0,width:32,background:"transparent",border:"none",cursor:"pointer",color:"#5A57A6",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"}}
@@ -10045,7 +10113,7 @@ const S = {
   bottomNavBar:     { flex:1, height:"100%", background:"#FFFFFF", border:"1px solid #C6C6C8", borderRadius:999, display:"flex", alignItems:"center", padding:5, boxShadow:"0 4px 14px #00000014", position:"relative" },
   bottomNavItem:    { minWidth:40, width:"16.666%", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", height:"100%", background:"none", border:"none", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif", position:"relative" },
   bottomNavHighlight: { width:"100%", height:"100%", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", borderRadius:999, position:"relative", left:1 },
-  bottomNavFab:     { width:58, height:58, flexShrink:0, background:"#1a1919", borderRadius:999, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", cursor:"pointer", border:"none", boxShadow:"0 4px 14px #00000030", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
+  bottomNavFab:     { width:46, height:46, flexShrink:0, background:"#1a1919", borderRadius:999, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", cursor:"pointer", border:"none", boxShadow:"0 4px 14px #00000030", fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif" },
 };
 
 // ─── スマホ取引先カードスタイル ──────────────────────────────────
